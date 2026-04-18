@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "429355239986",
+    "project_id": "smart-education-da018",
+    "storage_bucket": "smart-education-da018.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:429355239986:android:cd4d64f0034869ee0e0a2b",
+        "android_client_info": {
+          "package_name": "com.example.smart_exam"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDd8rQiL-g4AflohY_EsF5A9NN1Emp6M6w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
