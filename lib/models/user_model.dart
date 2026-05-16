@@ -5,23 +5,31 @@ class UserModel {
   final bool isApproved;
   final DateTime createdAt;
   final String fcmToken;
-  final String classId;
-  final String classLabel;
-  final String coordinatorId;
+
+  // ── Class assignment ──────────────────────────────────────
+  final String classId; // e.g. "FY-A"
+  final String classLabel; // e.g. "First Year - Division A"
+  final String coordinatorId; // for students: their coordinator's UID
+
+  // For coordinators: which student slot they manage
+  // HOD sets: slotStart=1, slotEnd=20 for CC-1; slotStart=21, slotEnd=40 for CC-2
+  // -1 means no limit (all students in class)
+  final int slotStart; // inclusive, 1-based
+  final int slotEnd; // inclusive
 
   // ── Academic Info ─────────────────────────────────────────
-  final String branch; // BIO-TECH-UG / BIO-TECH-PG
-  final String year; // FY / SY / TY
-  final String semester; // SEM-I ... SEM-VI
-  final String registerNo; // College registration number
+  final String branch;
+  final String year;
+  final String semester;
+  final String registerNo;
 
   // ── Personal Info ─────────────────────────────────────────
-  final String nameAsPerHsc; // As per HSC Marklist
-  final String nameAsPerAadhar; // As per Aadhar card
-  final String motherName; // Mother's name (before marriage)
-  final String abcId; // ABC ID
-  final String aadharNo; // Aadhar card number
-  final String dob; // Date of birth (dd/MM/yyyy)
+  final String nameAsPerHsc;
+  final String nameAsPerAadhar;
+  final String motherName;
+  final String abcId;
+  final String aadharNo;
+  final String dob;
   final String mobile;
   final String email;
   final String maritalStatus;
@@ -33,20 +41,20 @@ class UserModel {
   final String taluka;
   final String village;
 
-  // ── Family Info ───────────────────────────────────────────
+  // ── Family ────────────────────────────────────────────────
   final String fatherOrHusbandName;
   final String guardianOccupation;
 
-  // ── Category / Religion ───────────────────────────────────
+  // ── Category ─────────────────────────────────────────────
   final String religion;
   final String caste;
   final String actualCasteCategory;
   final String admittedCasteCategory;
   final String otherCategory;
-  final String hostelFacility; // 'Yes' / 'No'
+  final String hostelFacility;
 
-  // ── Legacy / Staff fields ─────────────────────────────────
-  final String name; // for staff (professor / coordinator / hod / principal)
+  // ── Staff fields ──────────────────────────────────────────
+  final String name;
   final String department;
   final String phone;
   final String photoUrl;
@@ -61,12 +69,12 @@ class UserModel {
     this.classId = '',
     this.classLabel = '',
     this.coordinatorId = '',
-    // Academic
+    this.slotStart = -1,
+    this.slotEnd = -1,
     this.branch = '',
     this.year = '',
     this.semester = '',
     this.registerNo = '',
-    // Personal
     this.nameAsPerHsc = '',
     this.nameAsPerAadhar = '',
     this.motherName = '',
@@ -76,31 +84,31 @@ class UserModel {
     this.mobile = '',
     this.email = '',
     this.maritalStatus = '',
-    // Address
     this.address = '',
     this.state = '',
     this.district = '',
     this.taluka = '',
     this.village = '',
-    // Family
     this.fatherOrHusbandName = '',
     this.guardianOccupation = '',
-    // Category
     this.religion = '',
     this.caste = '',
     this.actualCasteCategory = '',
     this.admittedCasteCategory = '',
-    this.otherCategory = '',
+    this.otherCategory = 'None',
     this.hostelFacility = 'No',
-    // Staff fields
     this.name = '',
     this.department = '',
     this.phone = '',
     this.photoUrl = '',
   });
 
-  /// Display name — uses nameAsPerHsc for students, name for staff
   String get displayName => nameAsPerHsc.isNotEmpty ? nameAsPerHsc : name;
+
+  bool get hasSlot => slotStart > 0 && slotEnd > 0;
+
+  String get slotLabel =>
+      hasSlot ? 'Students $slotStart–$slotEnd' : 'All Students';
 
   factory UserModel.fromMap(Map<String, dynamic> map, String id) {
     return UserModel(
@@ -113,6 +121,8 @@ class UserModel {
       classId: map['classId'] ?? '',
       classLabel: map['classLabel'] ?? '',
       coordinatorId: map['coordinatorId'] ?? '',
+      slotStart: (map['slotStart'] ?? -1) as int,
+      slotEnd: (map['slotEnd'] ?? -1) as int,
       branch: map['branch'] ?? '',
       year: map['year'] ?? '',
       semester: map['semester'] ?? '',
@@ -146,46 +156,46 @@ class UserModel {
     );
   }
 
-  Map<String, dynamic> toMap() {
-    return {
-      'erpId': erpId,
-      'role': role,
-      'isApproved': isApproved,
-      'createdAt': createdAt,
-      'fcmToken': fcmToken,
-      'classId': classId,
-      'classLabel': classLabel,
-      'coordinatorId': coordinatorId,
-      'branch': branch,
-      'year': year,
-      'semester': semester,
-      'registerNo': registerNo,
-      'nameAsPerHsc': nameAsPerHsc,
-      'nameAsPerAadhar': nameAsPerAadhar,
-      'motherName': motherName,
-      'abcId': abcId,
-      'aadharNo': aadharNo,
-      'dob': dob,
-      'mobile': mobile,
-      'email': email,
-      'maritalStatus': maritalStatus,
-      'address': address,
-      'state': state,
-      'district': district,
-      'taluka': taluka,
-      'village': village,
-      'fatherOrHusbandName': fatherOrHusbandName,
-      'guardianOccupation': guardianOccupation,
-      'religion': religion,
-      'caste': caste,
-      'actualCasteCategory': actualCasteCategory,
-      'admittedCasteCategory': admittedCasteCategory,
-      'otherCategory': otherCategory,
-      'hostelFacility': hostelFacility,
-      'name': name,
-      'department': department,
-      'phone': phone,
-      'photoUrl': photoUrl,
-    };
-  }
+  Map<String, dynamic> toMap() => {
+    'erpId': erpId,
+    'role': role,
+    'isApproved': isApproved,
+    'createdAt': createdAt,
+    'fcmToken': fcmToken,
+    'classId': classId,
+    'classLabel': classLabel,
+    'coordinatorId': coordinatorId,
+    'slotStart': slotStart,
+    'slotEnd': slotEnd,
+    'branch': branch,
+    'year': year,
+    'semester': semester,
+    'registerNo': registerNo,
+    'nameAsPerHsc': nameAsPerHsc,
+    'nameAsPerAadhar': nameAsPerAadhar,
+    'motherName': motherName,
+    'abcId': abcId,
+    'aadharNo': aadharNo,
+    'dob': dob,
+    'mobile': mobile,
+    'email': email,
+    'maritalStatus': maritalStatus,
+    'address': address,
+    'state': state,
+    'district': district,
+    'taluka': taluka,
+    'village': village,
+    'fatherOrHusbandName': fatherOrHusbandName,
+    'guardianOccupation': guardianOccupation,
+    'religion': religion,
+    'caste': caste,
+    'actualCasteCategory': actualCasteCategory,
+    'admittedCasteCategory': admittedCasteCategory,
+    'otherCategory': otherCategory,
+    'hostelFacility': hostelFacility,
+    'name': name,
+    'department': department,
+    'phone': phone,
+    'photoUrl': photoUrl,
+  };
 }

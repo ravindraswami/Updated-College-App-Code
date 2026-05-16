@@ -1,83 +1,81 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Generates ERP IDs like:
-///   Student:     CSC2026001, CSC2026002 ...
-///   Professor:   PCSC2026001
-///   Coordinator: CCSC2026001
-///   HOD:         HCSC2026001
-///   Principal:   PRIN2026001
+/// ID Strategy:
+///   Student  → NO auto ERP ID. Their college registerNo is their ID.
+///              If FY Sem I (comparative), registerNo may be empty initially.
+///   Staff    → Auto-generated: [rolePrefix][DEPT][YEAR][3-digit]
+///              Professor:    P-BIO-TECH-2026-001
+///              Coordinator:  CC-BIO-TECH-2026-001
+///              HOD:          HOD-BIO-TECH-2026-001
+///              Technical:    TECH-2026-001
+///              Non-Technical:NT-2026-001
+///              Principal:    PRIN-2026-001
 class IdService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  /// Prefix map per role
   static String _prefix(String role) {
     switch (role) {
       case 'professor':
-        return 'P';
+        return 'PROF';
       case 'coordinator':
-        return 'C';
+        return 'CC';
       case 'hod':
-        return 'H';
+        return 'HOD';
       case 'principal':
         return 'PRIN';
+      case 'technical':
+        return 'TECH';
+      case 'non_technical':
+        return 'NT';
       default:
-        return ''; // students have no prefix
+        return '';
     }
   }
 
-  /// Generate next ERP ID and atomically increment counter.
-  /// Format: [rolePrefix][DEPT][YEAR][3-digit-number]
-  /// e.g. CSC2026001, PCSC2026001
-  Future<String> generateErpId({
+  /// Generate ID for STAFF only.
+  /// Students use their college registerNo — no auto ID.
+  Future<String> generateStaffId({
     required String role,
     required String department,
     required String year,
   }) async {
-    final dept = department.toUpperCase().replaceAll(' ', '');
+    // Students do not get auto ERP IDs
+    if (role == 'student') return '';
+
+    final dept = department
+        .toUpperCase()
+        .replaceAll(' ', '')
+        .replaceAll('-', '');
     final yr = year.isNotEmpty ? year : DateTime.now().year.toString();
     final prefix = _prefix(role);
-    final counterKey = '$prefix$dept$yr';
 
-    // Use a Firestore transaction so two users registering at same time
-    // never get the same number
+    // Technical/Non-Technical don't use dept in their ID
+    final counterKey =
+        (role == 'technical' || role == 'non_technical' || role == 'principal')
+        ? '$prefix$yr'
+        : '$prefix$dept$yr';
+
     final counterRef = _db.collection('id_counters').doc(counterKey);
-
     int nextNum = 1;
     await _db.runTransaction((tx) async {
       final snap = await tx.get(counterRef);
-      if (snap.exists) {
-        nextNum = (snap.data()!['count'] as int) + 1;
-      }
+      if (snap.exists) nextNum = (snap.data()!['count'] as int) + 1;
       tx.set(counterRef, {'count': nextNum});
     });
 
     final num = nextNum.toString().padLeft(3, '0');
-    return '$prefix$dept$yr$num';
+
+    // Format: PROF-BIOTECH-2026-001 / CC-BIOTECH-2026-001 / TECH-2026-001
+    if (role == 'technical' || role == 'non_technical' || role == 'principal') {
+      return '$prefix-$yr-$num';
+    }
+    return '$prefix-$dept-$yr-$num';
   }
 
-  /// Call when a student/staff is REMOVED — decrements counter
-  /// so future IDs fill the gap... actually we just log it.
-  /// (In real ERP, IDs are never reused; we only track count for next new ID)
   Future<void> onUserRemoved(String erpId) async {
-    // IDs are permanent — we don't reuse them.
-    // But we store removed IDs for audit trail.
     await _db.collection('removed_ids').add({
       'erpId': erpId,
       'removedAt': FieldValue.serverTimestamp(),
     });
-  }
-
-  /// Get current count for a dept/year combo
-  Future<int> getCurrentCount({
-    required String role,
-    required String department,
-    required String year,
-  }) async {
-    final dept = department.toUpperCase().replaceAll(' ', '');
-    final prefix = _prefix(role);
-    final counterKey = '$prefix$dept$year';
-    final snap = await _db.collection('id_counters').doc(counterKey).get();
-    if (!snap.exists) return 0;
-    return snap.data()!['count'] as int;
   }
 }

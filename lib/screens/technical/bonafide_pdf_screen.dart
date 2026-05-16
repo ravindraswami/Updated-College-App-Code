@@ -278,7 +278,7 @@ class _CertificateWidget extends StatelessWidget {
                       ),
                       TextSpan(
                         text:
-                            ' degree course during the year 2025-26 (Monsoon / Summer) session..',
+                            ' (Agril. Biotechnology)/M.Sc(MBB) degree course during the year 2025-26 (Monsoon / Summer) session..',
                       ),
                     ],
                   ),

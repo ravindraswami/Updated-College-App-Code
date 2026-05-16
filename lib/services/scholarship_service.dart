@@ -151,4 +151,15 @@ class ScholarshipService {
         'technicalApprovedBy': by,
         'technicalRemarks': remarks,
       });
+
+  /// All scholarship requests — for recent activity feeds (newest first)
+  Stream<List<ScholarshipModel>> getAllScholarships() {
+    return _db
+        .collection('scholarship_requests')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((s) => s.docs
+            .map((d) => ScholarshipModel.fromMap(d.data(), d.id))
+            .toList());
+  }
 }

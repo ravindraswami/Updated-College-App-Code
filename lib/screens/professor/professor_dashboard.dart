@@ -7,6 +7,7 @@ import '../../utils/app_theme.dart';
 import '../../widgets/app_drawer.dart';
 import '../../widgets/common_widgets.dart';
 import '../auth/login_screen.dart';
+import 'subject_management_screen.dart';
 import '../profile/profile_screen.dart';
 import '../notes/notes_screen.dart';
 import '../notes/upload_note_screen.dart';
@@ -38,6 +39,11 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
       label: 'Study Materials',
       icon: Icons.book_outlined,
       selectedIcon: Icons.book,
+    ),
+    DrawerItem(
+      label: 'Subjects',
+      icon: Icons.list_alt_outlined,
+      selectedIcon: Icons.list_alt,
     ),
   ];
 
@@ -89,6 +95,8 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
         return ProfessorResultsScreen(professorId: _user!.id);
       case 2:
         return const NotesScreen();
+      case 3:
+        return SubjectManagementScreen(professor: _user!);
       default:
         return ExamManagementScreen(professorId: _user!.id);
     }

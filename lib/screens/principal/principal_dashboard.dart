@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../services/user_service.dart';
-import '../../services/exam_service.dart';
+import '../../services/nt_file_service.dart';
+import '../../models/nt_file_model.dart';
 import '../../models/user_model.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/constants.dart';
+import '../../widgets/app_drawer.dart';
 import '../../widgets/common_widgets.dart';
-import '../../widgets/student_list_widget.dart';
 import '../auth/login_screen.dart';
 import '../profile/profile_screen.dart';
 
@@ -16,9 +18,39 @@ class PrincipalDashboard extends StatefulWidget {
 }
 
 class _PrincipalDashboardState extends State<PrincipalDashboard> {
-  final _authService = AuthService();
+  final _auth = AuthService();
+  final _userSvc = UserService();
   UserModel? _user;
-  int _selectedIndex = 0;
+  int _bottomIndex = 0;
+  int _drawerIndex = 0;
+
+  static const _drawerItems = [
+    DrawerItem(
+      label: 'All Students',
+      icon: Icons.school_outlined,
+      selectedIcon: Icons.school,
+    ),
+    DrawerItem(
+      label: 'All Staff',
+      icon: Icons.people_outlined,
+      selectedIcon: Icons.people,
+    ),
+    DrawerItem(
+      label: 'Pending Approvals',
+      icon: Icons.approval_outlined,
+      selectedIcon: Icons.approval,
+    ),
+    DrawerItem(
+      label: 'NT Staff Files',
+      icon: Icons.folder_special_outlined,
+      selectedIcon: Icons.folder_special,
+    ),
+    DrawerItem(
+      label: 'Analytics',
+      icon: Icons.analytics_outlined,
+      selectedIcon: Icons.analytics,
+    ),
+  ];
 
   @override
   void initState() {
@@ -27,31 +59,31 @@ class _PrincipalDashboardState extends State<PrincipalDashboard> {
   }
 
   Future<void> _loadUser() async {
-    final user = await _authService.getCurrentUserModel();
-    if (mounted) setState(() => _user = user);
+    final u = await _auth.getCurrentUserModel();
+    if (mounted) setState(() => _user = u);
   }
 
   Future<void> _logout() async {
-    final confirm = await showDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Logout'),
-        content: const Text('Are you sure?'),
+        content: const Text('Are you sure you want to logout?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            onPressed: () => Navigator.pop(context, true),
             child: const Text('Logout'),
           ),
         ],
       ),
     );
-    if (confirm != true) return;
-    await _authService.logout();
+    if (ok != true) return;
+    await _auth.logout();
     if (!mounted) return;
     Navigator.pushReplacement(
       context,
@@ -59,68 +91,58 @@ class _PrincipalDashboardState extends State<PrincipalDashboard> {
     );
   }
 
+  Widget _drawerPage() {
+    if (_user == null) return const LoadingWidget();
+    switch (_drawerIndex) {
+      case 0:
+        return _AllStudentsTab(svc: _userSvc);
+      case 1:
+        return _AllStaffTab(svc: _userSvc);
+      case 2:
+        return _PendingApprovalsTab(svc: _userSvc);
+      case 3:
+        return const _NtFilesTab();
+      case 4:
+        return _AnalyticsTab(svc: _userSvc);
+      default:
+        return _AllStudentsTab(svc: _userSvc);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final pages = [
-      _PrincipalHomeTab(user: _user),
-      const StudentListWidget(),
-      _AllUsersTab(),
-      _CollegeAnalyticsTab(),
-      _user == null
-          ? const LoadingWidget()
-          : ProfileScreen(user: _user!, onLogout: _logout),
-    ];
-
+    const principalColor = Color(0xFF7C3AED);
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            const Text('Principal Portal'),
-            const Spacer(),
-            if (_user?.erpId.isNotEmpty == true)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  _user!.erpId,
-                  style: const TextStyle(color: Colors.white, fontSize: 11),
-                ),
-              ),
-          ],
+        title: Text(
+          _bottomIndex == 1 ? 'My Profile' : _drawerItems[_drawerIndex].label,
         ),
-        automaticallyImplyLeading: false,
-        backgroundColor: AppTheme.error,
+        backgroundColor: principalColor,
       ),
-      body: _user == null ? const LoadingWidget() : pages[_selectedIndex],
+      drawer: AppDrawer(
+        user: _user,
+        selectedIndex: _drawerIndex,
+        items: _drawerItems,
+        accentColor: principalColor,
+        onItemTap: (i) => setState(() {
+          _drawerIndex = i;
+          _bottomIndex = 0;
+        }),
+        onLogout: _logout,
+      ),
+      body: _bottomIndex == 1
+          ? (_user == null
+                ? const LoadingWidget()
+                : ProfileScreen(user: _user!, onLogout: _logout))
+          : _drawerPage(),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (i) => setState(() => _selectedIndex = i),
+        selectedIndex: _bottomIndex,
+        onDestinationSelected: (i) => setState(() => _bottomIndex = i),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),
             label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.school_outlined),
-            selectedIcon: Icon(Icons.school),
-            label: 'Students',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.people_outlined),
-            selectedIcon: Icon(Icons.people),
-            label: 'All Users',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.analytics_outlined),
-            selectedIcon: Icon(Icons.analytics),
-            label: 'Analytics',
           ),
           NavigationDestination(
             icon: Icon(Icons.account_circle_outlined),
@@ -133,146 +155,142 @@ class _PrincipalDashboardState extends State<PrincipalDashboard> {
   }
 }
 
-class _PrincipalHomeTab extends StatelessWidget {
-  final UserModel? user;
-  const _PrincipalHomeTab({required this.user});
+// ─────────────────────────────────────────────────────────────
+// All Students Tab
+// ─────────────────────────────────────────────────────────────
+class _AllStudentsTab extends StatelessWidget {
+  final UserService svc;
+  const _AllStudentsTab({required this.svc});
+
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppTheme.error, Color(0xFFB91C1C)],
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Principal',
-                  style: TextStyle(color: Colors.white70),
-                ),
-                Text(
-                  user?.name ?? '',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (user?.erpId.isNotEmpty == true)
-                  Text(
-                    user!.erpId,
-                    style: const TextStyle(
-                      color: Colors.white60,
-                      fontSize: 12,
-                      letterSpacing: 1,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          StreamBuilder(
-            stream: UserService().getAllUsers(),
-            builder: (_, snap) {
-              final users = snap.data ?? [];
-              return Row(
+    return StreamBuilder(
+      stream: svc.getUsersByRole('student'),
+      builder: (ctx, snap) {
+        if (!snap.hasData) return const LoadingWidget();
+        final students = snap.data!;
+        return Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: Colors.purple.withOpacity(0.06),
+              child: Row(
                 children: [
-                  Expanded(
-                    child: StatCard(
-                      title: 'Total Users',
-                      value: '${users.length}',
-                      icon: Icons.people,
-                      color: AppTheme.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: StatCard(
-                      title: 'Students',
-                      value:
-                          '${users.where((u) => u.role == "student").length}',
-                      icon: Icons.school,
-                      color: AppTheme.secondary,
-                    ),
+                  const Icon(Icons.school, color: Color(0xFF7C3AED), size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${students.length} Total Students',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ],
-              );
-            },
-          ),
-        ],
-      ),
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(12),
+                itemCount: students.length,
+                itemBuilder: (_, i) {
+                  final s = students[i];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: const Color(
+                          0xFF7C3AED,
+                        ).withOpacity(0.1),
+                        child: Text(
+                          s.displayName.isNotEmpty
+                              ? s.displayName[0].toUpperCase()
+                              : 'S',
+                          style: const TextStyle(
+                            color: Color(0xFF7C3AED),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      title: Text(
+                        s.displayName,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        '${s.branch} • ${s.classId}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      trailing: Icon(
+                        s.isApproved ? Icons.check_circle : Icons.pending,
+                        color: s.isApproved
+                            ? AppTheme.success
+                            : AppTheme.warning,
+                        size: 20,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
 
-class _AllUsersTab extends StatelessWidget {
+// ─────────────────────────────────────────────────────────────
+// All Staff Tab
+// ─────────────────────────────────────────────────────────────
+class _AllStaffTab extends StatelessWidget {
+  final UserService svc;
+  const _AllStaffTab({required this.svc});
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder(
-      stream: UserService().getAllUsers(),
+      stream: svc.getAllUsers(),
       builder: (ctx, snap) {
         if (!snap.hasData) return const LoadingWidget();
-        final users = snap.data!;
-        if (users.isEmpty) {
-          return const EmptyWidget(
-            message: 'No users registered',
-            icon: Icons.people_outlined,
-          );
-        }
+        final staff = snap.data!
+            .where(
+              (u) => [
+                'professor',
+                'coordinator',
+                'hod',
+                'principal',
+                'technical',
+                'non_technical',
+              ].contains(u.role),
+            )
+            .toList();
         return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: users.length,
+          padding: const EdgeInsets.all(12),
+          itemCount: staff.length,
           itemBuilder: (_, i) {
-            final u = users[i];
+            final u = staff[i];
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: AppTheme.roleColor(u.role).withOpacity(0.15),
-                  child: Icon(
-                    AppTheme.roleIcon(u.role),
-                    color: AppTheme.roleColor(u.role),
-                    size: 20,
+                  backgroundColor: const Color(0xFF7C3AED).withOpacity(0.1),
+                  child: Text(
+                    u.name.isNotEmpty ? u.name[0].toUpperCase() : '?',
+                    style: const TextStyle(
+                      color: Color(0xFF7C3AED),
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-                title: Text(u.name),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(u.email, style: const TextStyle(fontSize: 12)),
-                    if (u.erpId.isNotEmpty)
-                      Text(
-                        u.erpId,
-                        style: const TextStyle(
-                          color: AppTheme.primary,
-                          fontSize: 11,
-                        ),
-                      ),
-                  ],
+                title: Text(
+                  u.name,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
-                isThreeLine: true,
-                trailing: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    RoleBadge(role: u.role),
-                    const SizedBox(height: 4),
-                    Icon(
-                      u.isApproved ? Icons.check_circle : Icons.pending,
-                      color: u.isApproved ? AppTheme.success : AppTheme.warning,
-                      size: 16,
-                    ),
-                  ],
+                subtitle: Text(
+                  AppConstants.roleLabel(u.role),
+                  style: const TextStyle(fontSize: 12),
                 ),
-                onTap: () => _showActions(context, u),
+                trailing: Icon(
+                  u.isApproved ? Icons.verified : Icons.pending,
+                  color: u.isApproved ? AppTheme.success : AppTheme.warning,
+                  size: 20,
+                ),
               ),
             );
           },
@@ -280,54 +298,477 @@ class _AllUsersTab extends StatelessWidget {
       },
     );
   }
+}
 
-  void _showActions(BuildContext context, UserModel user) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+// ─────────────────────────────────────────────────────────────
+// Pending Approvals Tab
+// ─────────────────────────────────────────────────────────────
+class _PendingApprovalsTab extends StatelessWidget {
+  final UserService svc;
+  const _PendingApprovalsTab({required this.svc});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder(
+      stream: svc.getAllUsers(),
+      builder: (ctx, snap) {
+        if (!snap.hasData) return const LoadingWidget();
+        final pending = snap.data!.where((u) => !u.isApproved).toList();
+        if (pending.isEmpty) {
+          return const EmptyWidget(
+            message: 'No pending approvals.',
+            icon: Icons.check_circle_outline,
+          );
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(12),
+          itemCount: pending.length,
+          itemBuilder: (_, i) {
+            final u = pending[i];
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppTheme.warning.withOpacity(0.1),
+                  child: Text(
+                    u.displayName.isNotEmpty
+                        ? u.displayName[0].toUpperCase()
+                        : '?',
+                    style: const TextStyle(
+                      color: AppTheme.warning,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                title: Text(u.displayName),
+                subtitle: Text(
+                  '${AppConstants.roleLabel(u.role)} • ${u.email}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(
+                        Icons.check_circle,
+                        color: AppTheme.success,
+                      ),
+                      onPressed: () async {
+                        await svc.approveUser(u.id);
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(
+                              content: Text('${u.displayName} approved.'),
+                              backgroundColor: AppTheme.success,
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.cancel, color: AppTheme.error),
+                      onPressed: () async {
+                        await svc.rejectUser(u.id);
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(
+                              content: Text('${u.displayName} rejected.'),
+                              backgroundColor: AppTheme.error,
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// NT Staff Files Tab  (visible to Principal only)
+// ─────────────────────────────────────────────────────────────
+class _NtFilesTab extends StatefulWidget {
+  const _NtFilesTab();
+
+  @override
+  State<_NtFilesTab> createState() => _NtFilesTabState();
+}
+
+class _NtFilesTabState extends State<_NtFilesTab> {
+  final _svc = NtFileService();
+  String _filterUploader = '';
+  DateTime? _filterDate;
+  String _filterType = 'All';
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // ── Filter bar ──────────────────────────────────────
+        Container(
+          color: const Color(0xFF7C3AED).withOpacity(0.06),
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.filter_list,
+                    color: Color(0xFF7C3AED),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Filter Files',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                  const Spacer(),
+                  if (_filterUploader.isNotEmpty ||
+                      _filterDate != null ||
+                      _filterType != 'All')
+                    TextButton.icon(
+                      onPressed: () => setState(() {
+                        _filterUploader = '';
+                        _filterDate = null;
+                        _filterType = 'All';
+                      }),
+                      icon: const Icon(Icons.clear, size: 14),
+                      label: const Text(
+                        'Clear',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF7C3AED),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              // File type chips
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: ['All', 'PDF', 'Image', 'Word', 'Excel', 'Other']
+                      .map(
+                        (type) => Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: FilterChip(
+                            label: Text(
+                              type,
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            selected: _filterType == type,
+                            onSelected: (_) =>
+                                setState(() => _filterType = type),
+                            selectedColor: const Color(
+                              0xFF7C3AED,
+                            ).withOpacity(0.2),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+              const SizedBox(height: 6),
+              // Search + date filter
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      decoration: const InputDecoration(
+                        hintText: 'Search by uploader name...',
+                        prefixIcon: Icon(Icons.search, size: 18),
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                      onChanged: (v) =>
+                          setState(() => _filterUploader = v.toLowerCase()),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.calendar_today, size: 14),
+                    label: Text(
+                      _filterDate != null
+                          ? '${_filterDate!.day}/${_filterDate!.month}'
+                          : 'Date',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2024),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) setState(() => _filterDate = picked);
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF7C3AED),
+                      side: const BorderSide(color: Color(0xFF7C3AED)),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // ── File list ────────────────────────────────────────
+        Expanded(
+          child: StreamBuilder<List<NtFileModel>>(
+            stream: _svc.getAllFiles(),
+            builder: (ctx, snap) {
+              if (!snap.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              var files = snap.data!;
+
+              // Apply filters
+              if (_filterUploader.isNotEmpty) {
+                files = files
+                    .where(
+                      (f) => f.uploaderName.toLowerCase().contains(
+                        _filterUploader,
+                      ),
+                    )
+                    .toList();
+              }
+              if (_filterDate != null) {
+                files = files
+                    .where(
+                      (f) =>
+                          f.uploadedAt.year == _filterDate!.year &&
+                          f.uploadedAt.month == _filterDate!.month &&
+                          f.uploadedAt.day == _filterDate!.day,
+                    )
+                    .toList();
+              }
+              if (_filterType != 'All') {
+                const typeMap = {
+                  'PDF': ['pdf'],
+                  'Image': ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+                  'Word': ['doc', 'docx'],
+                  'Excel': ['xls', 'xlsx'],
+                };
+                if (_filterType == 'Other') {
+                  const allKnown = [
+                    'pdf',
+                    'jpg',
+                    'jpeg',
+                    'png',
+                    'gif',
+                    'webp',
+                    'doc',
+                    'docx',
+                    'xls',
+                    'xlsx',
+                  ];
+                  files = files
+                      .where(
+                        (f) => !allKnown.contains(f.fileType.toLowerCase()),
+                      )
+                      .toList();
+                } else {
+                  final validExts = typeMap[_filterType] ?? [];
+                  files = files
+                      .where(
+                        (f) => validExts.contains(f.fileType.toLowerCase()),
+                      )
+                      .toList();
+                }
+              }
+
+              if (files.isEmpty) {
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.folder_open, size: 56, color: Colors.grey),
+                      SizedBox(height: 12),
+                      Text(
+                        'No files match the current filter.',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          '${files.length} file(s)',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const Spacer(),
+                        const Text(
+                          'Visible only to Principal',
+                          style: TextStyle(color: Colors.grey, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                      itemCount: files.length,
+                      itemBuilder: (_, i) =>
+                          _NtPrincipalFileCard(file: files[i]),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// NT File Card
+// ─────────────────────────────────────────────────────────────
+class _NtPrincipalFileCard extends StatelessWidget {
+  final NtFileModel file;
+  const _NtPrincipalFileCard({required this.file});
+
+  Color get _typeColor {
+    switch (file.fileType.toLowerCase()) {
+      case 'pdf':
+        return Colors.red;
+      case 'png':
+      case 'jpg':
+      case 'jpeg':
+        return Colors.blue;
+      case 'doc':
+      case 'docx':
+        return const Color(0xFF2563EB);
+      case 'xls':
+      case 'xlsx':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              user.name,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            // File type badge
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: _typeColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(
+                child: Text(
+                  file.fileType.toUpperCase().isEmpty
+                      ? 'FILE'
+                      : file.fileType.toUpperCase(),
+                  style: TextStyle(
+                    color: _typeColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
             ),
-            Text(user.email, style: const TextStyle(color: Colors.grey)),
-            if (user.erpId.isNotEmpty)
-              Text(
-                user.erpId,
-                style: const TextStyle(
-                  color: AppTheme.primary,
-                  fontWeight: FontWeight.bold,
-                ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    file.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  if (file.description.isNotEmpty)
+                    Text(
+                      file.description,
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                  const SizedBox(height: 4),
+                  // Uploader
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.person_outline,
+                        size: 12,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          '${file.uploaderName} (${file.uploaderErpId})',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 11,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  // Date + time
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.access_time,
+                        size: 12,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${file.uploadedAt.day.toString().padLeft(2, '0')}/'
+                        '${file.uploadedAt.month.toString().padLeft(2, '0')}/'
+                        '${file.uploadedAt.year}  '
+                        '${file.uploadedAt.hour.toString().padLeft(2, '0')}:'
+                        '${file.uploadedAt.minute.toString().padLeft(2, '0')}',
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            const SizedBox(height: 16),
-            if (!user.isApproved)
-              ListTile(
-                leading: const Icon(
-                  Icons.check_circle,
-                  color: AppTheme.success,
-                ),
-                title: const Text('Approve User'),
-                onTap: () {
-                  UserService().approveUser(user.id);
-                  Navigator.pop(context);
-                },
-              ),
-            if (user.isApproved)
-              ListTile(
-                leading: const Icon(Icons.block, color: AppTheme.error),
-                title: const Text('Revoke Access'),
-                onTap: () {
-                  UserService().rejectUser(user.id);
-                  Navigator.pop(context);
-                },
-              ),
+            ),
           ],
         ),
       ),
@@ -335,147 +776,68 @@ class _AllUsersTab extends StatelessWidget {
   }
 }
 
-class _CollegeAnalyticsTab extends StatelessWidget {
+// ─────────────────────────────────────────────────────────────
+// Analytics Tab
+// ─────────────────────────────────────────────────────────────
+class _AnalyticsTab extends StatelessWidget {
+  final UserService svc;
+  const _AnalyticsTab({required this.svc});
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder(
-      stream: ExamService().getAllResults(),
+      stream: svc.getAllUsers(),
       builder: (ctx, snap) {
         if (!snap.hasData) return const LoadingWidget();
-        final results = snap.data!;
-        if (results.isEmpty) {
-          return const EmptyWidget(
-            message: 'No data yet',
-            icon: Icons.analytics_outlined,
-          );
+        final users = snap.data!;
+        final byRole = <String, int>{};
+        for (final u in users) {
+          byRole[u.role] = (byRole[u.role] ?? 0) + 1;
         }
-        final avg =
-            results.map((r) => r.percentage).reduce((a, b) => a + b) /
-            results.length;
-        final pass = results.where((r) => r.percentage >= 75).length;
-        final passRate = pass / results.length * 100;
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'College-Wide Analytics',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: StatCard(
-                      title: 'Total Attempts',
-                      value: '${results.length}',
-                      icon: Icons.quiz,
-                      color: AppTheme.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: StatCard(
-                      title: 'Avg Score',
-                      value: '${avg.toStringAsFixed(1)}%',
-                      icon: Icons.analytics,
-                      color: AppTheme.secondary,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: StatCard(
-                      title: 'Pass Rate',
-                      value: '${passRate.toStringAsFixed(0)}%',
-                      icon: Icons.trending_up,
-                      color: AppTheme.success,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: StatCard(
-                      title: 'Passed',
-                      value: '$pass',
-                      icon: Icons.check_circle,
-                      color: AppTheme.success,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Score Distribution',
+                'User Statistics',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
-              _ScoreBar(
-                '90-100%',
-                results.where((r) => r.percentage >= 90).length,
-                results.length,
-                AppTheme.success,
-              ),
-              _ScoreBar(
-                '75-90%',
-                results
-                    .where((r) => r.percentage >= 75 && r.percentage < 90)
-                    .length,
-                results.length,
-                AppTheme.primary,
-              ),
-              _ScoreBar(
-                '50-75%',
-                results
-                    .where((r) => r.percentage >= 50 && r.percentage < 75)
-                    .length,
-                results.length,
-                AppTheme.warning,
-              ),
-              _ScoreBar(
-                'Below 50%',
-                results.where((r) => r.percentage < 50).length,
-                results.length,
-                AppTheme.error,
+              ...byRole.entries.map(
+                (e) => Card(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  child: ListTile(
+                    leading: const Icon(Icons.people, color: Color(0xFF7C3AED)),
+                    title: Text(
+                      AppConstants.roleLabel(e.key),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF7C3AED).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${e.value}',
+                        style: const TextStyle(
+                          color: Color(0xFF7C3AED),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
         );
       },
-    );
-  }
-
-  Widget _ScoreBar(String label, int count, int total, Color color) {
-    final pct = total == 0 ? 0.0 : count / total;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(label, style: const TextStyle(fontSize: 12)),
-          ),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: pct,
-                backgroundColor: Colors.grey[200],
-                color: color,
-                minHeight: 12,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '$count',
-            style: TextStyle(color: color, fontWeight: FontWeight.bold),
-          ),
-        ],
-      ),
     );
   }
 }

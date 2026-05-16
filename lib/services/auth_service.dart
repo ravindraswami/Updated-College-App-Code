@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
 import 'id_service.dart';
+import 'user_service.dart';
 import '../utils/principal_config.dart';
 import 'notification_service.dart';
 
@@ -65,11 +66,18 @@ class AuthService {
       );
       final uid = credential.user!.uid;
 
-      final erpId = await _idService.generateErpId(
-        role: role,
-        department: department.isNotEmpty ? department : 'GEN',
-        year: year.isNotEmpty ? year : DateTime.now().year.toString(),
-      );
+      // Students: erpId = their college registerNo (or empty if FY Sem I)
+      // Staff: auto-generated role-based ID
+      String erpId;
+      if (role == 'student') {
+        erpId = registerNo.isNotEmpty ? registerNo : '';
+      } else {
+        erpId = await _idService.generateStaffId(
+          role: role,
+          department: department.isNotEmpty ? department : 'GEN',
+          year: year.isNotEmpty ? year : DateTime.now().year.toString(),
+        );
+      }
 
       // Build classId from branch+semester for students
       // Format: "BIO-TECH-UG|SEM-I"

@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "jetro": {
+      "command": "C:\\Users\\Suru_D\\.jetro\\runtime\\node-win32-x64.exe",
+      "args": [
+        "C:\\Users\\Suru_D\\.jetro\\mcp-server\\index.js"
+      ],
+      "env": {
+        "JET_WORKSPACE": "d:\\All Projects\\Android\\smart_exam",
+        "JET_API_URL": "https://api.jetro.ai",
+        "PATH": "C:\\Users\\Suru_D\\.jetro\\runtime;C:\\Users\\Suru_D\\AppData\\Local\\Programs\\Microsoft VS Code;C:\\Program Files\\Common Files\\Oracle\\Java\\javapath;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\WINDOWS\\System32\\Wbem;C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\;C:\\WINDOWS\\System32\\OpenSSH\\;C:\\flutter\\bin;C:\\Program Files\\Java\\jdk-17\\bin;C:\\Program Files\\nodejs\\;C:\\Program Files\\Git\\cmd;C:\\Users\\Suru_D\\AppData\\Local\\Pub\\Cache\\bin;C:\\Users\\Suru_D\\AppData\\Local\\Android\\Sdk\\platform-tools;C:\\Users\\Suru_D\\.local\\bin;C:\\Program Files (x86)\\pcsuite\\;C:\\Users\\Suru_D\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\;C:\\Users\\Suru_D\\AppData\\Local\\Programs\\Python\\Python311\\;C:\\Users\\Suru_D\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Users\\Suru_D\\AppData\\Local\\Programs\\Microsoft VS Code\\bin;C:\\Users\\Suru_D\\AppData\\Local\\Python\\bin;C:\\Users\\Suru_D\\AppData\\Roaming\\npm;C:\\Users\\Suru_D\\AppData\\Local\\Programs\\Antigravity\\bin"
+      }
+    }
+  }
+}
