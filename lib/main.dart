@@ -83,6 +83,8 @@ class _NotifRouteState extends State<_NotifRoute> {
         return const ProfessorDashboard();
       case 'coordinator':
         return const CoordinatorDashboard();
+      case 'ug_incharge':
+      case 'pg_incharge':
       case 'hod':
         return const HodDashboard();
       case 'principal':
@@ -140,6 +142,8 @@ class _SplashScreenState extends State<SplashScreen> {
       case 'coordinator':
         home = const CoordinatorDashboard();
         break;
+      case 'ug_incharge':
+      case 'pg_incharge':
       case 'hod':
         home = const HodDashboard();
         break;

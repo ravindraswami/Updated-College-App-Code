@@ -5,7 +5,7 @@ class AcademicData {
   static const List<Map<String, dynamic>> branches = [
     {
       'id': 'BIO-TECH-UG',
-      'label': 'BIO-TECH (UG)',
+      'label': 'B.Tech (Biotechnology)',
       'years': [
         {
           'id': 'FY', 'label': 'First Year (FY)',
@@ -33,11 +33,20 @@ class AcademicData {
           ],
           'regNoRequired': true,
         },
+        {
+          'id': 'LY',
+          'label': 'Fourth Year (LY)',
+          'sems': [
+            {'id': 'SEM-VII', 'label': 'Semester VII'},
+            {'id': 'SEM-VIII', 'label': 'Semester VIII'},
+          ],
+          'regNoRequired': true,
+        },
       ],
     },
     {
       'id': 'BIO-TECH-PG',
-      'label': 'BIO-TECH (PG)',
+      'label': 'M.Sc (Molecular Biology & Biotechnology)',
       'years': [
         {
           'id': 'FY',
@@ -60,6 +69,41 @@ class AcademicData {
       ],
     },
   ];
+
+  /// Full, non-abbreviated display name for a branch
+  /// e.g. BIO-TECH-UG -> "Biotechnology Undergraduate"
+  /// e.g. BIO-TECH-PG -> "Biotechnology Postgraduate"
+  static String branchFullLabel(String branchId) {
+    switch (branchId) {
+      case 'BIO-TECH-UG':
+        return 'Biotechnology Undergraduate';
+      case 'BIO-TECH-PG':
+        return 'Biotechnology Postgraduate';
+      default:
+        final branch = branches.firstWhere(
+          (b) => b['id'] == branchId,
+          orElse: () => {},
+        );
+        return branch.isEmpty ? branchId : (branch['label'] as String);
+    }
+  }
+
+  /// Full, non-abbreviated display name for a year
+  /// e.g. FY -> "First Year", SY -> "Second Year", TY -> "Third Year", LY -> "Final Year"
+  static String yearFullLabel(String yearId) {
+    switch (yearId) {
+      case 'FY':
+        return 'First Year';
+      case 'SY':
+        return 'Second Year';
+      case 'TY':
+        return 'Third Year';
+      case 'LY':
+        return 'Final Year';
+      default:
+        return yearId;
+    }
+  }
 
   static List<Map<String, dynamic>> yearsForBranch(String branchId) {
     final branch = branches.firstWhere(

@@ -10,6 +10,7 @@ import '../../widgets/app_drawer.dart';
 import '../../widgets/common_widgets.dart';
 import '../auth/login_screen.dart';
 import '../profile/profile_screen.dart';
+import 'monthly_report_screen.dart';
 
 class PrincipalDashboard extends StatefulWidget {
   const PrincipalDashboard({super.key});
@@ -49,6 +50,11 @@ class _PrincipalDashboardState extends State<PrincipalDashboard> {
       label: 'Analytics',
       icon: Icons.analytics_outlined,
       selectedIcon: Icons.analytics,
+    ),
+    DrawerItem(
+      label: 'Monthly Reports',
+      icon: Icons.summarize_outlined,
+      selectedIcon: Icons.summarize,
     ),
   ];
 
@@ -104,6 +110,8 @@ class _PrincipalDashboardState extends State<PrincipalDashboard> {
         return const _NtFilesTab();
       case 4:
         return _AnalyticsTab(svc: _userSvc);
+      case 5:
+        return const MonthlyReportScreen();
       default:
         return _AllStudentsTab(svc: _userSvc);
     }
@@ -162,6 +170,50 @@ class _AllStudentsTab extends StatelessWidget {
   final UserService svc;
   const _AllStudentsTab({required this.svc});
 
+  Future<void> _confirmDelete(BuildContext context, UserModel student) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Student'),
+        content: Text(
+          'Are you sure you want to permanently delete '
+          '"${student.displayName}" (${student.erpId})?\n\n'
+          'This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.error,
+                foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await svc.deleteUser(student.id, student.erpId ?? '');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${student.displayName} deleted.'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder(
@@ -195,9 +247,8 @@ class _AllStudentsTab extends StatelessWidget {
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: const Color(
-                          0xFF7C3AED,
-                        ).withOpacity(0.1),
+                        backgroundColor:
+                            const Color(0xFF7C3AED).withOpacity(0.1),
                         child: Text(
                           s.displayName.isNotEmpty
                               ? s.displayName[0].toUpperCase()
@@ -213,15 +264,30 @@ class _AllStudentsTab extends StatelessWidget {
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(
-                        '${s.branch} • ${s.classId}',
+                        '${s.branch} • ${s.classId}\nID: ${s.erpId ?? '—'}',
                         style: const TextStyle(fontSize: 12),
                       ),
-                      trailing: Icon(
-                        s.isApproved ? Icons.check_circle : Icons.pending,
-                        color: s.isApproved
-                            ? AppTheme.success
-                            : AppTheme.warning,
-                        size: 20,
+                      isThreeLine: true,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            s.isApproved
+                                ? Icons.check_circle
+                                : Icons.pending,
+                            color: s.isApproved
+                                ? AppTheme.success
+                                : AppTheme.warning,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline,
+                                color: AppTheme.error),
+                            tooltip: 'Delete Student',
+                            onPressed: () => _confirmDelete(ctx, s),
+                          ),
+                        ],
                       ),
                     ),
                   );
@@ -242,6 +308,51 @@ class _AllStaffTab extends StatelessWidget {
   final UserService svc;
   const _AllStaffTab({required this.svc});
 
+  Future<void> _confirmDelete(BuildContext context, dynamic u) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Staff Member'),
+        content: Text(
+          'Are you sure you want to delete "${u.name}" (${AppConstants.roleLabel(u.role)})?\n\nThis action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      try {
+        await svc.deleteUser(u.id, u.erpId ?? '');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${u.name} deleted successfully.'),
+              backgroundColor: AppTheme.success,
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting user: $e'),
+              backgroundColor: AppTheme.error,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder(
@@ -253,6 +364,8 @@ class _AllStaffTab extends StatelessWidget {
               (u) => [
                 'professor',
                 'coordinator',
+                'ug_incharge',
+                'pg_incharge',
                 'hod',
                 'principal',
                 'technical',
@@ -283,13 +396,26 @@ class _AllStaffTab extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 subtitle: Text(
-                  AppConstants.roleLabel(u.role),
+                  '${AppConstants.roleLabel(u.role)}  •  ${u.erpId ?? ''}',
                   style: const TextStyle(fontSize: 12),
                 ),
-                trailing: Icon(
-                  u.isApproved ? Icons.verified : Icons.pending,
-                  color: u.isApproved ? AppTheme.success : AppTheme.warning,
-                  size: 20,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      u.isApproved ? Icons.verified : Icons.pending,
+                      color: u.isApproved ? AppTheme.success : AppTheme.warning,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 4),
+                    // Fix 3: delete button (principal can delete staff/Incharge)
+                    if (u.role != 'principal')
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: AppTheme.error, size: 20),
+                        tooltip: 'Delete ${AppConstants.roleLabel(u.role)}',
+                        onPressed: () => _confirmDelete(ctx, u),
+                      ),
+                  ],
                 ),
               ),
             );

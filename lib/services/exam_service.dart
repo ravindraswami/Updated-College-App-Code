@@ -38,6 +38,22 @@ class ExamService {
         );
   }
 
+  /// Fix 2: Returns exams that target this student's branch/semester (or targetAllStudents).
+  Stream<List<ExamModel>> getExamsForStudent({
+    required String branch,
+    required String semester,
+  }) {
+    return _db.collection('exams').snapshots().map((s) {
+      final all = s.docs.map((d) => ExamModel.fromMap(d.data(), d.id)).toList();
+      return all.where((e) {
+        if (e.targetAllStudents || e.targetBranch.isEmpty) return true;
+        if (e.targetBranch != branch) return false;
+        if (e.targetSemester.isEmpty) return true; // branch match, any sem
+        return e.targetSemester == semester;
+      }).toList()..sort((a, b) => a.examDate.compareTo(b.examDate));
+    });
+  }
+
   Stream<List<ExamModel>> getExamsByProfessor(String professorId) {
     return _db
         .collection('exams')
@@ -71,12 +87,30 @@ class ExamService {
     }
   }
 
+  /// Live count of questions actually saved for an exam. Used instead of
+  /// the exam's stored `totalQuestions` field so the count shown to the
+  /// professor/student is always correct, even if that field ever drifts
+  /// out of sync (e.g. a partially-failed save).
+  Stream<int> watchQuestionCount(String examId) {
+    return _db
+        .collection('questions')
+        .where('examId', isEqualTo: examId)
+        .snapshots()
+        .map((s) => s.docs.length);
+  }
+
   Future<void> addQuestion(QuestionModel question) async {
     await _db.collection('questions').add(question.toMap());
   }
 
   Future<void> updateQuestion(QuestionModel question) async {
     await _db.collection('questions').doc(question.id).update(question.toMap());
+  }
+
+  Future<void> updateQuestionImage(String questionId, String imageUrl) async {
+    await _db.collection('questions').doc(questionId).update({
+      'imageUrl': imageUrl,
+    });
   }
 
   Future<void> deleteQuestion(String questionId) async {

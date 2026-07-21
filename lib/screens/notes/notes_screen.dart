@@ -6,7 +6,7 @@ import '../../widgets/common_widgets.dart';
 import 'pdf_viewer_screen.dart';
 
 class NotesScreen extends StatelessWidget {
-  // classId = '' means show all notes (for professors/HOD/Principal)
+  // classId = '' means show all notes (for professors/Incharge/Principal)
   // classId = 'FY-A' means show only notes for FY-A + global notes
   final String classId;
   const NotesScreen({super.key, this.classId = ''});

@@ -13,6 +13,7 @@ class BonafideService {
     required String semester,
     required String rollNo,
     required String purpose,
+    double charges = 50.0,
   }) async {
     final ref = await _db.collection('bonafide_requests').add({
       'studentId': studentId,
@@ -27,7 +28,7 @@ class BonafideService {
       'status': 'pending_payment',
       'isPaid': false,
       'paymentId': '',
-      'charges': 50.0,
+      'charges': charges,
       'approvedBy': '',
       'approvedDate': '',
       'pdfUrl': '',
@@ -36,10 +37,17 @@ class BonafideService {
     return ref.id;
   }
 
-  Future<void> markPaymentDone(String bonafideId, String paymentId) async {
+  Future<void> markPaymentDone(
+    String bonafideId,
+    String transactionId, {
+    String paymentDate = '',
+    String screenshotUrl = '',
+  }) async {
     await _db.collection('bonafide_requests').doc(bonafideId).update({
       'isPaid': true,
-      'paymentId': paymentId,
+      'paymentId': transactionId,
+      'paymentDate': paymentDate,
+      'paymentScreenshotUrl': screenshotUrl,
       'status': 'pending_approval',
     });
   }
@@ -93,6 +101,20 @@ class BonafideService {
               .map((d) => BonafideModel.fromMap(d.data(), d.id))
               .toList();
           list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          return list;
+        });
+  }
+
+  Stream<List<BonafideModel>> getApprovedBonafides() {
+    return _db
+        .collection('bonafide_requests')
+        .where('status', isEqualTo: 'approved')
+        .snapshots()
+        .map((s) {
+          final list = s.docs
+              .map((d) => BonafideModel.fromMap(d.data(), d.id))
+              .toList();
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           return list;
         });
   }

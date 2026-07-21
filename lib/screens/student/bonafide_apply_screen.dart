@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:smart_exam/screens/technical/bonafide_pdf_screen.dart';
 import '../../models/user_model.dart';
 import '../../models/bonafide_model.dart';
 import '../../services/bonafide_service.dart';
+import '../../services/fee_config_service.dart';
 import '../../utils/app_theme.dart';
+import 'payment_screen.dart';
 
 class BonafideApplyScreen extends StatefulWidget {
   final UserModel student;
@@ -22,7 +23,8 @@ class _BonafideApplyScreenState extends State<BonafideApplyScreen> {
       stream: _svc.getStudentBonafides(widget.student.id),
       builder: (context, snap) {
         final requests = snap.data ?? [];
-        final approved = requests.where((r) => r.status == 'approved').toList();
+        // Student only sees pending/processing requests, NOT approved certs
+        // (approved certificates are managed and printed by Technical Staff only)
         final pending = requests.where((r) => r.status != 'approved').toList();
 
         return SingleChildScrollView(
@@ -48,21 +50,34 @@ class _BonafideApplyScreenState extends State<BonafideApplyScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
 
-              // ── Approved certificates ─────────────────────
-              if (approved.isNotEmpty) ...[
-                const _SectionHeader(
-                  icon: Icons.verified,
-                  label: 'Approved Certificates',
-                  color: AppTheme.success,
+              // Info banner — tell student where to get approved cert
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.success.withOpacity(0.07),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.success.withOpacity(0.2)),
                 ),
-                const SizedBox(height: 8),
-                ...approved.map(
-                  (r) => _BonafideCard(request: r, student: widget.student),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      color: AppTheme.success,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'Once approved, collect your bonafide certificate from the Technical Department.',
+                        style: TextStyle(color: AppTheme.success, fontSize: 12),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 20),
-              ],
+              ),
+              const SizedBox(height: 20),
 
               // ── Pending / other requests ──────────────────
               if (pending.isNotEmpty) ...[
@@ -104,92 +119,6 @@ class _BonafideApplyScreenState extends State<BonafideApplyScreen> {
           ),
         );
       },
-    );
-  }
-}
-
-// ── Card for approved certificate ────────────────────────────
-class _BonafideCard extends StatelessWidget {
-  final BonafideModel request;
-  final UserModel student;
-  const _BonafideCard({required this.request, required this.student});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppTheme.success.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.verified, color: AppTheme.success, size: 16),
-                      SizedBox(width: 6),
-                      Text(
-                        'Approved',
-                        style: TextStyle(
-                          color: AppTheme.success,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  request.applyDate,
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Purpose: ${request.purpose}',
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
-            if (request.approvedDate.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                'Approved on: ${request.approvedDate}',
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
-              ),
-            ],
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        BonafidePdfScreen(bonafide: request, approverName: ''),
-                  ),
-                ),
-                icon: const Icon(Icons.download),
-                label: const Text('View / Download Certificate'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.success,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -264,9 +193,11 @@ class _BonafideStatusCard extends StatelessWidget {
                   onPressed: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => BonafidePaymentScreen(
-                        bonafideId: request.id,
-                        charges: request.charges,
+                      builder: (_) => PaymentScreen(
+                        requestId: request.id,
+                        amount: request.charges,
+                        studentName: request.studentName,
+                        paymentFor: PaymentFor.bonafide,
                       ),
                     ),
                   ),
@@ -353,8 +284,17 @@ class _BonafideFormScreenState extends State<_BonafideFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _purposeCtrl = TextEditingController();
   final _svc = BonafideService();
+  final _feeSvc = FeeConfigService();
   bool _isLoading = false;
-  final double _charges = 50.0;
+  double _charges = FeeConfigService.defaultBonafideFee;
+
+  @override
+  void initState() {
+    super.initState();
+    _feeSvc.getFees().then((fees) {
+      if (mounted) setState(() => _charges = fees['bonafideFee']!);
+    });
+  }
 
   String get _todayDate => DateFormat('dd/MM/yyyy').format(DateTime.now());
 
@@ -373,14 +313,21 @@ class _BonafideFormScreenState extends State<_BonafideFormScreen> {
         semester: widget.student.semester,
         rollNo: widget.student.registerNo,
         purpose: _purposeCtrl.text.trim(),
+        charges: _charges,
       );
       if (!mounted) return;
-      // ✅ FIX: Push payment screen, don't replace — so back button works properly
+      // Navigate to PaymentScreen with real SBI link
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) =>
-              BonafidePaymentScreen(bonafideId: id, charges: _charges),
+          builder: (_) => PaymentScreen(
+            requestId: id,
+            amount: _charges,
+            studentName: widget.student.nameAsPerHsc.isNotEmpty
+                ? widget.student.nameAsPerHsc
+                : widget.student.name,
+            paymentFor: PaymentFor.bonafide,
+          ),
         ),
       );
     } catch (e) {
@@ -562,11 +509,13 @@ class _BonafideFormScreenState extends State<_BonafideFormScreen> {
 class BonafidePaymentScreen extends StatefulWidget {
   final String bonafideId;
   final double charges;
+
   const BonafidePaymentScreen({
     super.key,
     required this.bonafideId,
     required this.charges,
   });
+
   @override
   State<BonafidePaymentScreen> createState() => _BonafidePaymentScreenState();
 }

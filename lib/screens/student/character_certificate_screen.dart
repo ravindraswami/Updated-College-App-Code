@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import '../../models/user_model.dart';
 import '../../models/character_cert_model.dart';
 import '../../utils/app_theme.dart';
@@ -168,26 +171,164 @@ class CharacterCertificateScreen extends StatelessWidget {
     );
   }
 
-  void _downloadCertificate(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Certificate download initiated...'),
-        backgroundColor: AppTheme.success,
-        duration: Duration(seconds: 3),
+  Future<pw.Document> _buildPdf() async {
+    final doc = pw.Document();
+    final name = student.nameAsPerHsc.isNotEmpty
+        ? student.nameAsPerHsc
+        : student.name;
+    doc.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(40),
+        build: (ctx) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.center,
+          children: [
+            pw.Text(
+              'CERTIFICATE OF CHARACTER',
+              style: pw.TextStyle(
+                fontSize: 18,
+                fontWeight: pw.FontWeight.bold,
+                letterSpacing: 2,
+              ),
+            ),
+            pw.SizedBox(height: 4),
+            pw.Container(width: 100, height: 2, color: PdfColors.teal),
+            pw.SizedBox(height: 20),
+            pw.Text(
+              'This is to certify that ${name}, S/o D/o ${student.fatherOrHusbandName.isNotEmpty ? student.fatherOrHusbandName : "—"}, '
+              'bearing ERP ID ${cert.erpId}, was a bonafide student of this college, '
+              'studying in ${cert.branch} — ${cert.year} — ${cert.semester}. '
+              'The student\'s conduct and character during the period of study has been found to be "${cert.conductRemark}".',
+              style: const pw.TextStyle(fontSize: 12),
+              textAlign: pw.TextAlign.justify,
+            ),
+            pw.SizedBox(height: 20),
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+              columnWidths: {
+                0: const pw.FixedColumnWidth(160),
+                1: const pw.FlexColumnWidth(),
+              },
+              children:
+                  [
+                    ['Student Name', name],
+                    ['ERP / Roll No.', cert.erpId],
+                    ['Branch', cert.branch],
+                    ['Year / Semester', '${cert.year} — ${cert.semester}'],
+                    ['Conduct / Character', cert.conductRemark],
+                    [
+                      'Date of Issue',
+                      cert.approvedDate.isNotEmpty
+                          ? cert.approvedDate.substring(0, 10)
+                          : DateFormat('dd/MM/yyyy').format(DateTime.now()),
+                    ],
+                  ].map((row) {
+                    return pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 5,
+                          ),
+                          child: pw.Text(
+                            row[0],
+                            style: pw.TextStyle(
+                              fontWeight: pw.FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 5,
+                          ),
+                          child: pw.Text(
+                            row[1].isNotEmpty ? row[1] : '—',
+                            style: const pw.TextStyle(fontSize: 10),
+                          ),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+            ),
+            pw.SizedBox(height: 50),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(
+                  children: [
+                    pw.Container(width: 100, height: 1, color: PdfColors.black),
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                      'Student Signature',
+                      style: const pw.TextStyle(
+                        fontSize: 9,
+                        color: PdfColors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+                pw.Column(
+                  children: [
+                    pw.Container(width: 130, height: 1, color: PdfColors.black),
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                      'Principal / Authorized Signatory',
+                      style: const pw.TextStyle(
+                        fontSize: 9,
+                        color: PdfColors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 20),
+            pw.Divider(color: PdfColors.grey300),
+            pw.Text(
+              'Generated via Smart ERP • ${DateFormat('dd MMM yyyy').format(DateTime.now())}',
+              style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey),
+            ),
+          ],
+        ),
       ),
     );
-    // TODO: Implement PDF generation and download
+    return doc;
   }
 
-  void _shareCertificate(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Share functionality coming soon...'),
-        backgroundColor: AppTheme.primary,
-        duration: Duration(seconds: 3),
-      ),
-    );
-    // TODO: Implement sharing functionality
+  Future<void> _downloadCertificate(BuildContext context) async {
+    try {
+      final doc = await _buildPdf();
+      final bytes = await doc.save();
+      await Printing.layoutPdf(onLayout: (_) async => bytes);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating PDF: $e'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _shareCertificate(BuildContext context) async {
+    try {
+      final doc = await _buildPdf();
+      final bytes = await doc.save();
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: 'Character_Certificate_${cert.erpId}.pdf',
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.error),
+        );
+      }
+    }
   }
 }
 

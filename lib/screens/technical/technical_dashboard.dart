@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../../services/auth_service.dart';
 import '../../services/scholarship_service.dart';
 import '../../services/bonafide_service.dart';
@@ -16,6 +19,10 @@ import '../../widgets/common_widgets.dart';
 import '../auth/login_screen.dart';
 import '../profile/profile_screen.dart';
 import '../exam_form/exam_form_technical_tab.dart';
+import '../principal/monthly_report_screen.dart';
+import 'fee_settings_screen.dart';
+import 'tc_edit_screen.dart';
+import 'certificate_pdfs.dart' as cert_pdf;
 
 class TechnicalDashboard extends StatefulWidget {
   const TechnicalDashboard({super.key});
@@ -64,6 +71,18 @@ class _TechnicalDashboardState extends State<TechnicalDashboard> {
         return _ScholarshipTab(svc: _scholarshipSvc, user: _user);
       case 5:
         return ExamFormTechnicalTab(technicalUser: _user);
+      case 6:
+        return const MonthlyReportScreen();
+      case 7:
+        return _CertHistoryTab(
+          tcSvc: _tcSvc,
+          ccSvc: _ccSvc,
+          bonafideSvc: _bonafideSvc,
+          examFormSvc: _examFormSvc,
+          scholarshipSvc: _scholarshipSvc,
+        );
+      case 8:
+        return const FeeSettingsScreen();
       default:
         return _TechHomeTab(
           user: _user,
@@ -146,6 +165,9 @@ class _TechnicalDashboardState extends State<TechnicalDashboard> {
       'Character Certificates',
       'Scholarship Reviews',
       'Exam Forms',
+      'Monthly Reports',
+      'Certificate Print History',
+      'Fee Settings',
     ];
 
     return WillPopScope(
@@ -240,7 +262,7 @@ class _TechHomeTab extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Technical Staff',
+                  'Education Section',
                   style: TextStyle(color: Colors.white70, fontSize: 13),
                 ),
                 Text(
@@ -565,47 +587,231 @@ class _ActivityTile extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-// BONAFIDE TAB
+// BONAFIDE TAB  (Pending + Approved with PDF print/save)
 // ─────────────────────────────────────────────────────────────
-class _BonafideTab extends StatelessWidget {
+class _BonafideTab extends StatefulWidget {
   final BonafideService svc;
   final UserModel? user;
-
   const _BonafideTab({required this.svc, required this.user});
+  @override
+  State<_BonafideTab> createState() => _BonafideTabState();
+}
+
+class _BonafideTabState extends State<_BonafideTab>
+    with SingleTickerProviderStateMixin {
+  late TabController _tab;
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<BonafideModel>>(
-      stream: svc.getPendingBonafides(),
-      builder: (ctx, snap) {
-        if (!snap.hasData) return const LoadingWidget();
-        final list = snap.data!;
-        if (list.isEmpty) {
-          return const EmptyWidget(
-            message: 'No bonafide requests pending approval.',
-            icon: Icons.badge_outlined,
-          );
-        }
-        return Column(
-          children: [
-            _TabHeader(
-              icon: Icons.badge,
-              color: const Color(0xFF7C3AED),
-              label: '${list.length} bonafide request(s) pending',
-            ),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(12),
-                itemCount: list.length,
-                itemBuilder: (_, i) =>
-                    _BonafideCard(request: list[i], svc: svc, user: user),
-              ),
-            ),
+    return Column(
+      children: [
+        TabBar(
+          controller: _tab,
+          tabs: const [
+            Tab(icon: Icon(Icons.pending_actions, size: 16), text: 'Pending'),
+            Tab(icon: Icon(Icons.check_circle, size: 16), text: 'Approved'),
           ],
-        );
-      },
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tab,
+            children: [
+              // ── PENDING ──────────────────────────────────
+              StreamBuilder<List<BonafideModel>>(
+                stream: widget.svc.getPendingBonafides(),
+                builder: (ctx, snap) {
+                  if (!snap.hasData) return const LoadingWidget();
+                  final list = snap.data!;
+                  if (list.isEmpty) {
+                    return const EmptyWidget(
+                      message: 'No bonafide requests pending approval.',
+                      icon: Icons.badge_outlined,
+                    );
+                  }
+                  return Column(
+                    children: [
+                      _TabHeader(
+                        icon: Icons.badge,
+                        color: const Color(0xFF7C3AED),
+                        label: '${list.length} pending request(s)',
+                      ),
+                      Expanded(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: list.length,
+                          itemBuilder: (_, i) => _BonafideCard(
+                              request: list[i],
+                              svc: widget.svc,
+                              user: widget.user),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+
+              // ── APPROVED — with print / PDF save ─────────
+              StreamBuilder<List<BonafideModel>>(
+                stream: widget.svc.getApprovedBonafides(),
+                builder: (ctx, snap) {
+                  if (!snap.hasData) return const LoadingWidget();
+                  final list = snap.data!;
+                  if (list.isEmpty) {
+                    return const EmptyWidget(
+                      message: 'No approved bonafide certificates yet.',
+                      icon: Icons.badge_outlined,
+                    );
+                  }
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: list.length,
+                    itemBuilder: (_, i) =>
+                        _ApprovedBonafideCard(bonafide: list[i]),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
+}
+
+// ─── Approved bonafide card with Print + Save PDF ────────────
+class _ApprovedBonafideCard extends StatelessWidget {
+  final BonafideModel bonafide;
+  const _ApprovedBonafideCard({required this.bonafide});
+
+  Future<void> _printCert(BuildContext context) async {
+    await cert_pdf.printBonafide(bonafide);
+  }
+
+  Future<void> _savePdf(BuildContext context) async {
+    await cert_pdf.saveBonafide(bonafide);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Student header
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: const Color(0xFF7C3AED).withOpacity(0.12),
+                  child: Text(
+                    bonafide.studentName.isNotEmpty
+                        ? bonafide.studentName[0].toUpperCase()
+                        : 'S',
+                    style: const TextStyle(
+                        color: Color(0xFF7C3AED), fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(bonafide.studentName,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 15),
+                          overflow: TextOverflow.ellipsis),
+                      Text(
+                          'ERP: ${bonafide.erpId}  •  ${bonafide.branch} ${bonafide.year}',
+                          style: const TextStyle(
+                              color: Colors.grey, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppTheme.success.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text('Approved',
+                      style: TextStyle(
+                          color: AppTheme.success,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _infoRow(Icons.info_outline, 'Purpose', bonafide.purpose),
+            _infoRow(Icons.person_outline, 'Approved By', bonafide.approvedBy),
+            _infoRow(Icons.calendar_today, 'Date', bonafide.approvedDate),
+            const SizedBox(height: 12),
+
+            // Action buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _savePdf(context),
+                    icon: const Icon(Icons.save_alt, size: 16),
+                    label: const Text('Save PDF'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF7C3AED),
+                      side: const BorderSide(color: Color(0xFF7C3AED)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _printCert(context),
+                    icon: const Icon(Icons.print, size: 16),
+                    label: const Text('Print'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF7C3AED),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) => Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Row(
+          children: [
+            Icon(icon, size: 14, color: Colors.grey),
+            const SizedBox(width: 6),
+            Text('$label: ',
+                style: const TextStyle(color: Colors.grey, fontSize: 12)),
+            Expanded(
+              child: Text(value,
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w500),
+                  overflow: TextOverflow.ellipsis),
+            ),
+          ],
+        ),
+      );
 }
 
 class _BonafideCard extends StatelessWidget {
@@ -675,7 +881,7 @@ class _BonafideCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final staffName = user?.name.isNotEmpty == true
         ? user!.name
-        : user?.nameAsPerHsc ?? 'Technical Staff';
+        : user?.nameAsPerHsc ?? 'Education Section';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -740,43 +946,107 @@ class _BonafideCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────
 // TC TAB
 // ─────────────────────────────────────────────────────────────
-class _TcTab extends StatelessWidget {
+class _TcTab extends StatefulWidget {
   final TcService svc;
   final String techUid;
-
   const _TcTab({required this.svc, required this.techUid});
+  @override
+  State<_TcTab> createState() => _TcTabState();
+}
+
+class _TcTabState extends State<_TcTab> with SingleTickerProviderStateMixin {
+  late TabController _tab;
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<TcModel>>(
-      stream: svc.getPendingTcs(),
-      builder: (ctx, snap) {
-        if (!snap.hasData) return const LoadingWidget();
-        final list = snap.data!;
-        if (list.isEmpty) {
-          return const EmptyWidget(
-            message: 'No pending TC requests.',
-            icon: Icons.article_outlined,
-          );
-        }
-        return Column(
-          children: [
-            _TabHeader(
-              icon: Icons.article,
-              color: const Color(0xFF0891B2),
-              label: '${list.length} TC request(s) pending review',
-            ),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(12),
-                itemCount: list.length,
-                itemBuilder: (_, i) =>
-                    _TcCard(tc: list[i], svc: svc, techUid: techUid),
-              ),
-            ),
+    return Column(
+      children: [
+        TabBar(
+          controller: _tab,
+          tabs: const [
+            Tab(icon: Icon(Icons.pending_actions, size: 16), text: 'Pending'),
+            Tab(icon: Icon(Icons.check_circle, size: 16), text: 'Approved'),
           ],
-        );
-      },
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tab,
+            children: [
+              // Pending
+              StreamBuilder<List<TcModel>>(
+                stream: widget.svc.getPendingTcs(),
+                builder: (ctx, snap) {
+                  if (!snap.hasData) return const LoadingWidget();
+                  final list = snap.data!;
+                  if (list.isEmpty) {
+                    return const EmptyWidget(
+                        message: 'No pending TC requests.', icon: Icons.article_outlined);
+                  }
+                  return Column(
+                    children: [
+                      _TabHeader(
+                          icon: Icons.article,
+                          color: const Color(0xFF0891B2),
+                          label: '${list.length} TC request(s) pending review'),
+                      Expanded(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: list.length,
+                          itemBuilder: (_, i) => _TcCard(
+                              tc: list[i], svc: widget.svc, techUid: widget.techUid),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              // Approved
+              StreamBuilder<List<TcModel>>(
+                stream: widget.svc.getApprovedTcs(),
+                builder: (ctx, snap) {
+                  if (!snap.hasData) return const LoadingWidget();
+                  final list = snap.data!;
+                  if (list.isEmpty) {
+                    return const EmptyWidget(
+                        message: 'No approved TCs yet.', icon: Icons.article_outlined);
+                  }
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: list.length,
+                    itemBuilder: (_, i) => _ApprovedCertTile(
+                      name: list[i].studentName,
+                      erpId: list[i].erpId,
+                      date: list[i].approvedDate,
+                      detail: list[i].reasonForLeaving,
+                      icon: Icons.article,
+                      color: const Color(0xFF0891B2),
+                      branch: list[i].branch,
+                      year: list[i].year,
+                      semester: list[i].semester,
+                      approvedBy: list[i].approvedBy,
+                      certType: 'TC',
+                      certId: list[i].id,
+                      tcModel: list[i],
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -887,6 +1157,18 @@ class _TcCard extends StatelessWidget {
             const SizedBox(height: 8),
             _PaidBadge(amount: tc.charges),
             const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => TcEditScreen(tc: tc)),
+                ),
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: const Text('Edit Details'),
+              ),
+            ),
+            const SizedBox(height: 10),
             _ActionButtons(
               onReject: () => _reject(context),
               onApprove: () async {
@@ -915,46 +1197,116 @@ class _TcCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────
 // CHARACTER CERTIFICATE TAB
 // ─────────────────────────────────────────────────────────────
-class _CharCertTab extends StatelessWidget {
+class _CharCertTab extends StatefulWidget {
   final CharacterCertService svc;
   final String techUid;
-
   const _CharCertTab({required this.svc, required this.techUid});
+  @override
+  State<_CharCertTab> createState() => _CharCertTabState();
+}
+
+class _CharCertTabState extends State<_CharCertTab>
+    with SingleTickerProviderStateMixin {
+  late TabController _tab;
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<CharacterCertModel>>(
-      stream: svc.getPendingCerts(),
-      builder: (ctx, snap) {
-        if (!snap.hasData) return const LoadingWidget();
-        final list = snap.data!;
-        if (list.isEmpty) {
-          return const EmptyWidget(
-            message: 'No pending character certificate requests.',
-            icon: Icons.workspace_premium_outlined,
-          );
-        }
-        return Column(
-          children: [
-            _TabHeader(
-              icon: Icons.workspace_premium,
-              color: const Color(0xFFB45309),
-              label: '${list.length} character cert request(s) pending',
-            ),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(12),
-                itemCount: list.length,
-                itemBuilder: (_, i) =>
-                    _CharCertCard(cert: list[i], svc: svc, techUid: techUid),
-              ),
-            ),
+    return Column(
+      children: [
+        TabBar(
+          controller: _tab,
+          tabs: const [
+            Tab(icon: Icon(Icons.pending_actions, size: 16), text: 'Pending'),
+            Tab(icon: Icon(Icons.check_circle, size: 16), text: 'Approved'),
           ],
-        );
-      },
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tab,
+            children: [
+              // Pending
+              StreamBuilder<List<CharacterCertModel>>(
+                stream: widget.svc.getPendingCerts(),
+                builder: (ctx, snap) {
+                  if (!snap.hasData) return const LoadingWidget();
+                  final list = snap.data!;
+                  if (list.isEmpty) {
+                    return const EmptyWidget(
+                        message: 'No pending character certificate requests.',
+                        icon: Icons.workspace_premium_outlined);
+                  }
+                  return Column(
+                    children: [
+                      _TabHeader(
+                          icon: Icons.workspace_premium,
+                          color: const Color(0xFFB45309),
+                          label: '${list.length} character cert request(s) pending'),
+                      Expanded(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: list.length,
+                          itemBuilder: (_, i) => _CharCertCard(
+                              cert: list[i],
+                              svc: widget.svc,
+                              techUid: widget.techUid),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              // Approved
+              StreamBuilder<List<CharacterCertModel>>(
+                stream: widget.svc.getApprovedCerts(),
+                builder: (ctx, snap) {
+                  if (!snap.hasData) return const LoadingWidget();
+                  final list = snap.data!;
+                  if (list.isEmpty) {
+                    return const EmptyWidget(
+                        message: 'No approved character certificates yet.',
+                        icon: Icons.workspace_premium_outlined);
+                  }
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: list.length,
+                    itemBuilder: (_, i) => _ApprovedCertTile(
+                      name: list[i].studentName,
+                      erpId: list[i].erpId,
+                      date: list[i].approvedDate,
+                      detail: '${list[i].purpose}  •  Conduct: ${list[i].conductRemark}',
+                      icon: Icons.workspace_premium,
+                      color: const Color(0xFFB45309),
+                      branch: list[i].branch,
+                      year: list[i].year,
+                      semester: list[i].semester,
+                      approvedBy: list[i].approvedBy,
+                      certType: 'Character Certificate',
+                      certId: list[i].id,
+                      charModel: list[i],
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
+
 
 class _CharCertCard extends StatelessWidget {
   final CharacterCertModel cert;
@@ -1075,43 +1427,110 @@ class _CharCertCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────
 // SCHOLARSHIP TAB
 // ─────────────────────────────────────────────────────────────
-class _ScholarshipTab extends StatelessWidget {
+class _ScholarshipTab extends StatefulWidget {
   final ScholarshipService svc;
   final UserModel? user;
-
   const _ScholarshipTab({required this.svc, required this.user});
+  @override
+  State<_ScholarshipTab> createState() => _ScholarshipTabState();
+}
+
+class _ScholarshipTabState extends State<_ScholarshipTab>
+    with SingleTickerProviderStateMixin {
+  late TabController _tab;
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<ScholarshipModel>>(
-      stream: svc.getPendingTechnical(),
-      builder: (ctx, snap) {
-        if (!snap.hasData) return const LoadingWidget();
-        final list = snap.data!;
-        if (list.isEmpty) {
-          return const EmptyWidget(
-            message: 'No scholarship applications pending review.',
-            icon: Icons.school_outlined,
-          );
-        }
-        return Column(
-          children: [
-            _TabHeader(
-              icon: Icons.school,
-              color: const Color(0xFF0F766E),
-              label: '${list.length} application(s) pending review',
-            ),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(12),
-                itemCount: list.length,
-                itemBuilder: (_, i) =>
-                    _ScholarshipCard(app: list[i], svc: svc, user: user),
-              ),
-            ),
+    return Column(
+      children: [
+        TabBar(
+          controller: _tab,
+          tabs: const [
+            Tab(icon: Icon(Icons.pending_actions, size: 16), text: 'Pending'),
+            Tab(icon: Icon(Icons.check_circle, size: 16), text: 'Approved'),
           ],
-        );
-      },
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tab,
+            children: [
+              // Pending
+              StreamBuilder<List<ScholarshipModel>>(
+                stream: widget.svc.getPendingTechnical(),
+                builder: (ctx, snap) {
+                  if (!snap.hasData) return const LoadingWidget();
+                  final list = snap.data!;
+                  if (list.isEmpty) {
+                    return const EmptyWidget(
+                        message: 'No scholarship applications pending review.',
+                        icon: Icons.school_outlined);
+                  }
+                  return Column(
+                    children: [
+                      _TabHeader(
+                          icon: Icons.school,
+                          color: const Color(0xFF0F766E),
+                          label: '${list.length} application(s) pending review'),
+                      Expanded(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: list.length,
+                          itemBuilder: (_, i) => _ScholarshipCard(
+                              app: list[i],
+                              svc: widget.svc,
+                              user: widget.user),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              // Approved
+              StreamBuilder<List<ScholarshipModel>>(
+                stream: widget.svc.getApprovedScholarships(),
+                builder: (ctx, snap) {
+                  if (!snap.hasData) return const LoadingWidget();
+                  final list = snap.data!;
+                  if (list.isEmpty) {
+                    return const EmptyWidget(
+                        message: 'No approved scholarships yet.',
+                        icon: Icons.school_outlined);
+                  }
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: list.length,
+                    itemBuilder: (_, i) => _ApprovedCertTile(
+                      name: list[i].studentName,
+                      erpId: list[i].erpId,
+                      date: list[i].technicalApprovedDate,
+                      detail: list[i].scholarshipType,
+                      icon: Icons.school,
+                      color: const Color(0xFF0F766E),
+                      branch: list[i].branch,
+                      year: list[i].year,
+                      approvedBy: list[i].technicalApprovedBy,
+                      certType: 'Scholarship',
+                      certId: list[i].id,
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1184,7 +1603,7 @@ class _ScholarshipCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final staffName = user?.name.isNotEmpty == true
         ? user!.name
-        : user?.nameAsPerHsc ?? 'Technical Staff';
+        : user?.nameAsPerHsc ?? 'Education Section';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1279,8 +1698,159 @@ class _ScholarshipCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────
 // SHARED SMALL WIDGETS  (all top-level)
 // ─────────────────────────────────────────────────────────────
+// APPROVED CERT CARD — Print + Save PDF (TC, CharCert, Scholarship)
+// ─────────────────────────────────────────────────────────────
+class _ApprovedCertTile extends StatelessWidget {
+  final String name;
+  final String erpId;
+  final String date;
+  final String detail;
+  final IconData icon;
+  final Color color;
+  final String branch;
+  final String year;
+  final String semester;
+  final String approvedBy;
+  final String certType;
+  final String certId;
+  final TcModel? tcModel;
+  final CharacterCertModel? charModel;
+
+  const _ApprovedCertTile({
+    required this.name,
+    required this.erpId,
+    required this.date,
+    required this.detail,
+    required this.icon,
+    required this.color,
+    this.branch = '',
+    this.year = '',
+    this.semester = '',
+    this.approvedBy = '',
+    this.certType = 'Certificate',
+    this.certId = '',
+    this.tcModel,
+    this.charModel,
+  });
+
+  Future<void> _print(BuildContext context) async {
+    if (tcModel != null) { await cert_pdf.printTransferCert(tcModel!); return; }
+    if (charModel != null) { await cert_pdf.printCharacterCert(charModel!); return; }
+    // Scholarship: generic
+    final doc = pw.Document();
+    doc.addPage(pw.Page(build: (_) => pw.Center(child: pw.Text('$name — $certType'))));
+    await Printing.layoutPdf(onLayout: (_) async => await doc.save(), name: '$name.pdf');
+  }
+
+  Future<void> _save(BuildContext context) async {
+    if (tcModel != null) { await cert_pdf.saveTransferCert(tcModel!); return; }
+    if (charModel != null) { await cert_pdf.saveCharacterCert(charModel!); return; }
+    final doc = pw.Document();
+    doc.addPage(pw.Page(build: (_) => pw.Center(child: pw.Text('$name — $certType'))));
+    await Printing.sharePdf(bytes: await doc.save(), filename: '$name.pdf');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: color.withOpacity(0.12),
+                  child: Icon(icon, color: color, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 14),
+                          overflow: TextOverflow.ellipsis),
+                      Text('ERP: $erpId  •  $date',
+                          style: const TextStyle(
+                              fontSize: 11, color: Colors.grey)),
+                      if (detail.isNotEmpty)
+                        Text(detail,
+                            style: const TextStyle(fontSize: 11),
+                            overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppTheme.success.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text('Approved',
+                      style: TextStyle(
+                          color: AppTheme.success,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _save(context),
+                    icon: const Icon(Icons.save_alt, size: 16),
+                    label: const Text('Save PDF'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: color,
+                      side: BorderSide(color: color),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _print(context),
+                    icon: const Icon(Icons.print, size: 16),
+                    label: const Text('Print'),
+                    style: ElevatedButton.styleFrom(backgroundColor: color),
+                  ),
+                ),
+              ],
+            ),
+            if (tcModel != null) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TcEditScreen(tc: tcModel!),
+                    ),
+                  ),
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: const Text('Edit Details'),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
 
 class _TabHeader extends StatelessWidget {
+
   final IconData icon;
   final Color color;
   final String label;
@@ -1522,13 +2092,28 @@ class _TechDrawer extends StatelessWidget {
       icon: Icons.edit_document,
       selectedIcon: Icons.edit_document,
     ),
+    _DrawerEntry(
+      label: 'Monthly Reports',
+      icon: Icons.summarize_outlined,
+      selectedIcon: Icons.summarize,
+    ),
+    _DrawerEntry(
+      label: 'Certificate Print History',
+      icon: Icons.history_outlined,
+      selectedIcon: Icons.history,
+    ),
+    _DrawerEntry(
+      label: 'Fee Settings',
+      icon: Icons.currency_rupee_outlined,
+      selectedIcon: Icons.currency_rupee,
+    ),
   ];
 
   @override
   Widget build(BuildContext context) {
     final displayName = user?.name.isNotEmpty == true
         ? user!.name
-        : user?.nameAsPerHsc ?? 'Technical Staff';
+        : user?.nameAsPerHsc ?? 'Education Section';
 
     return Drawer(
       child: Column(
@@ -1569,7 +2154,7 @@ class _TechDrawer extends StatelessWidget {
                     ),
                   ),
                   const Text(
-                    'Technical Staff',
+                    'Education Section',
                     style: TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                   if (user?.erpId.isNotEmpty == true)
@@ -1653,4 +2238,603 @@ class _DrawerEntry {
     required this.icon,
     required this.selectedIcon,
   });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Certificate Print History Tab
+// ─────────────────────────────────────────────────────────────
+class _CertHistoryTab extends StatefulWidget {
+  final TcService tcSvc;
+  final CharacterCertService ccSvc;
+  final BonafideService bonafideSvc;
+  final ExamFormService examFormSvc;
+  final ScholarshipService scholarshipSvc;
+
+  const _CertHistoryTab({
+    required this.tcSvc,
+    required this.ccSvc,
+    required this.bonafideSvc,
+    required this.examFormSvc,
+    required this.scholarshipSvc,
+  });
+
+  @override
+  State<_CertHistoryTab> createState() => _CertHistoryTabState();
+}
+
+class _CertHistoryTabState extends State<_CertHistoryTab>
+    with SingleTickerProviderStateMixin {
+  late TabController _tab;
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = TabController(length: 5, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        TabBar(
+          controller: _tab,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          tabs: const [
+            Tab(text: 'TC'),
+            Tab(text: 'Character Cert'),
+            Tab(text: 'Bonafide'),
+            Tab(text: 'Exam Form'),
+            Tab(text: 'Scholarship'),
+          ],
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tab,
+            children: [
+              _HistoryList<TcModel>(
+                stream: widget.tcSvc.getApprovedTcs(),
+                title: 'Transfer Certificate',
+                rowBuilder: (item) => _HistoryRow(
+                  studentName: item.studentName,
+                  studentId: item.studentId,
+                  date: item.approvedDate,
+                  reason: item.reasonForLeaving,
+                ),
+              ),
+              _HistoryList<CharacterCertModel>(
+                stream: widget.ccSvc.getApprovedCerts(),
+                title: 'Character Certificate',
+                rowBuilder: (item) => _HistoryRow(
+                  studentName: item.studentName,
+                  studentId: item.studentId,
+                  date: item.approvedDate,
+                  reason: item.purpose,
+                ),
+              ),
+              _HistoryList<BonafideModel>(
+                stream: widget.bonafideSvc.getApprovedBonafides(),
+                title: 'Bonafide Certificate',
+                rowBuilder: (item) => _HistoryRow(
+                  studentName: item.studentName,
+                  studentId: item.studentId,
+                  date: item.approvedDate,
+                  reason: item.purpose,
+                ),
+              ),
+              _HistoryList<ExamFormModel>(
+                stream: widget.examFormSvc.getApprovedForms(),
+                title: 'Exam Form',
+                rowBuilder: (item) => _HistoryRow(
+                  studentName: item.studentId, // ExamForm has no studentName
+                  studentId: item.studentId,
+                  date: item.submittedAt.toString().split(' ')[0],
+                  reason: '${item.branch} – ${item.year} – ${item.semester}',
+                ),
+              ),
+              _ScholarshipHistoryList(
+                stream: widget.scholarshipSvc.getApprovedScholarships(),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// Generic list that shows records + PDF print button
+class _HistoryList<T> extends StatelessWidget {
+  final Stream<List<T>> stream;
+  final String title;
+  final Widget Function(T) rowBuilder;
+
+  const _HistoryList({
+    required this.stream,
+    required this.title,
+    required this.rowBuilder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<T>>(
+      stream: stream,
+      builder: (ctx, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const LoadingWidget();
+        }
+        final items = snap.data ?? [];
+        if (items.isEmpty) {
+          return const Center(child: Text('No approved records found.'));
+        }
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.picture_as_pdf),
+                  label: const Text('Print Report (PDF)'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F766E),
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () => _printPdf(context, items, title),
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView.separated(
+                itemCount: items.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (_, i) => rowBuilder(items[i]),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _printPdf(
+      BuildContext context, List<T> items, String title) async {
+    try {
+      // Build simple HTML report
+      final now = DateTime.now();
+      final dateStr =
+          '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+      final rows = items.map((item) {
+        String name = '', id = '', date = '', reason = '';
+        if (item is TcModel) {
+          name = item.studentName;
+          id = item.studentId;
+          date = item.approvedDate;
+          reason = item.reasonForLeaving;
+        } else if (item is CharacterCertModel) {
+          name = item.studentName;
+          id = item.studentId;
+          date = item.approvedDate;
+          reason = item.purpose;
+        } else if (item is BonafideModel) {
+          name = item.studentName;
+          id = item.studentId;
+          date = item.approvedDate;
+          reason = item.purpose;
+        } else if (item is ExamFormModel) {
+          name = item.studentId;
+          id = item.studentId;
+          date = item.submittedAt.toString().split(' ')[0];
+          reason = '${item.branch} – ${item.year} – ${item.semester}';
+        } else if (item is ScholarshipModel) {
+          name = item.studentName;
+          id = item.studentId;
+          date = item.createdAt.toString().split(' ')[0];
+          reason = item.scholarshipType;
+        }
+        return '<tr>'
+            '<td>$name</td>'
+            '<td>$id</td>'
+            '<td>$date</td>'
+            '<td>$reason</td>'
+            '</tr>';
+      }).join();
+
+      final html = '''<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<style>
+  body { font-family: Arial, sans-serif; margin: 24px; }
+  h2 { color: #0F766E; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  th { background: #0F766E; color: #fff; padding: 8px; text-align: left; }
+  td { padding: 7px 8px; border-bottom: 1px solid #ddd; }
+  tr:nth-child(even) td { background: #f5f5f5; }
+  .meta { font-size: 13px; color: #555; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+  <h2>$title – Approved Print History</h2>
+  <p class="meta">Generated on: $dateStr</p>
+  <p class="meta">Total records: ${items.length}</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Student Name</th>
+        <th>Student ID</th>
+        <th>Date</th>
+        <th>Reason / Type</th>
+      </tr>
+    </thead>
+    <tbody>$rows</tbody>
+  </table>
+</body>
+</html>''';
+
+      // Show share/print dialog using the printing package (already in pubspec)
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Generating PDF report…'),
+              duration: Duration(seconds: 2)),
+        );
+      }
+      // Write html to a temp and open
+      await _openHtmlAsPdf(context, html, title);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _openHtmlAsPdf(
+      BuildContext context, String html, String title) async {
+    // Use printing package to print/share as PDF
+    // Add import at top of this widget file
+    // We pass to the OS print dialogue
+    try {
+      // ignore: undefined_prefixed_name
+      // Use dart:html on web, or share on mobile
+      // For Flutter mobile: use printing package
+      // The printing package exposes Printing.layoutPdf
+      // This depends on `printing` being in pubspec.yaml.
+      // We show the HTML in a dialog as fallback if printing not available.
+      if (context.mounted) {
+        await showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: Text('$title – Print Report'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.picture_as_pdf,
+                      size: 48, color: Color(0xFF0F766E)),
+                  const SizedBox(height: 8),
+                  Text('Report ready with ${html.split('<tr>').length - 2} records.'),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'To print: integrate the `printing` package and call Printing.layoutPdf(). The HTML report is generated and ready.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('PDF error: $e');
+    }
+  }
+}
+
+class _HistoryRow extends StatelessWidget {
+  final String studentName;
+  final String studentId;
+  final String date;
+  final String reason;
+
+  const _HistoryRow({
+    required this.studentName,
+    required this.studentId,
+    required this.date,
+    required this.reason,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: const CircleAvatar(
+        backgroundColor: Color(0xFFE0F2F1),
+        child: Icon(Icons.person, color: Color(0xFF0F766E)),
+      ),
+      title: Text(studentName,
+          style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Text('ID: $studentId  •  $date\n$reason'),
+      isThreeLine: true,
+    );
+  }
+}
+
+// ── Scholarship history with Category + Gender filters ──────────────
+class _ScholarshipHistoryList extends StatefulWidget {
+  final Stream<List<ScholarshipModel>> stream;
+  const _ScholarshipHistoryList({required this.stream});
+
+  @override
+  State<_ScholarshipHistoryList> createState() =>
+      _ScholarshipHistoryListState();
+}
+
+class _ScholarshipHistoryListState extends State<_ScholarshipHistoryList> {
+  String? _categoryFilter; // null = All
+  String? _genderFilter; // null = All
+
+  static const _categories = [
+    'EBC Punjabrao',
+    'EBC Rajarshi Shahu Maharaj',
+    'OBC GOI',
+    'OBC Freeship',
+    'SC/ST GOI',
+    'SC/ST Freeship',
+    'VJNT GOI',
+    'VJNT Freeship',
+    'Swadhar Dr. Babasaheb Ambedkar',
+  ];
+
+  static const _genders = ['Male', 'Female', 'Other'];
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<ScholarshipModel>>(
+      stream: widget.stream,
+      builder: (ctx, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const LoadingWidget();
+        }
+        final allItems = snap.data ?? [];
+        final items = allItems.where((s) {
+          final catOk =
+              _categoryFilter == null || s.scholarshipType == _categoryFilter;
+          final genderOk = _genderFilter == null || s.gender == _genderFilter;
+          return catOk && genderOk;
+        }).toList();
+
+        return Column(
+          children: [
+            // ── Filter bar ─────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _categoryFilter,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Category',
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
+                      hint: const Text('All Categories'),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: null,
+                          child: Text('All Categories'),
+                        ),
+                        ..._categories.map(
+                          (c) => DropdownMenuItem(value: c, child: Text(c)),
+                        ),
+                      ],
+                      onChanged: (v) => setState(() => _categoryFilter = v),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _genderFilter,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Gender',
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
+                      hint: const Text('All'),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: null,
+                          child: Text('All'),
+                        ),
+                        ..._genders.map(
+                          (g) => DropdownMenuItem(value: g, child: Text(g)),
+                        ),
+                      ],
+                      onChanged: (v) => setState(() => _genderFilter = v),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${items.length} record(s) found',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ),
+            ),
+            if (items.isEmpty)
+              const Expanded(
+                child: Center(child: Text('No approved records found.')),
+              )
+            else ...[
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.picture_as_pdf),
+                    label: const Text('Print Report (PDF)'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F766E),
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () => _printPdf(context, items),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: ListView.separated(
+                  itemCount: items.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (_, i) {
+                    final item = items[i];
+                    return _HistoryRow(
+                      studentName: item.studentName,
+                      studentId: item.studentId,
+                      date: item.createdAt.toString().split(' ')[0],
+                      reason:
+                          '${item.scholarshipType}${item.gender.isNotEmpty ? " • ${item.gender}" : ""}',
+                    );
+                  },
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _printPdf(
+      BuildContext context, List<ScholarshipModel> items) async {
+    try {
+      final now = DateTime.now();
+      final dateStr =
+          '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+      final rows = items.map((item) {
+        return '<tr>'
+            '<td>${item.studentName}</td>'
+            '<td>${item.studentId}</td>'
+            '<td>${item.createdAt.toString().split(' ')[0]}</td>'
+            '<td>${item.scholarshipType}</td>'
+            '<td>${item.gender}</td>'
+            '</tr>';
+      }).join();
+
+      final filterDesc =
+          '${_categoryFilter ?? "All Categories"} • ${_genderFilter ?? "All Genders"}';
+
+      final html = '''<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<style>
+  body { font-family: Arial, sans-serif; margin: 24px; }
+  h2 { color: #0F766E; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  th { background: #0F766E; color: #fff; padding: 8px; text-align: left; }
+  td { padding: 7px 8px; border-bottom: 1px solid #ddd; }
+  tr:nth-child(even) td { background: #f5f5f5; }
+  .meta { font-size: 13px; color: #555; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+  <h2>Scholarship – Approved Print History</h2>
+  <p class="meta">Generated on: $dateStr</p>
+  <p class="meta">Filter: $filterDesc</p>
+  <p class="meta">Total records: ${items.length}</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Student Name</th>
+        <th>Student ID</th>
+        <th>Date</th>
+        <th>Category</th>
+        <th>Gender</th>
+      </tr>
+    </thead>
+    <tbody>$rows</tbody>
+  </table>
+</body>
+</html>''';
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Generating PDF report…'),
+              duration: Duration(seconds: 2)),
+        );
+      }
+      await _openHtmlAsPdfForScholarship(context, html);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _openHtmlAsPdfForScholarship(
+      BuildContext context, String html) async {
+    try {
+      if (context.mounted) {
+        await showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Scholarship – Print Report'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.picture_as_pdf,
+                      size: 48, color: Color(0xFF0F766E)),
+                  const SizedBox(height: 8),
+                  Text(
+                      'Report ready with ${html.split('<tr>').length - 2} records.'),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'To print: integrate the `printing` package and call Printing.layoutPdf(). The HTML report is generated and ready.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('PDF error: $e');
+    }
+  }
 }

@@ -763,6 +763,41 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                         height: 1.5,
                       ),
                     ),
+                    // Question image (if any)
+                    if (q.imageUrl.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.network(
+                          q.imageUrl,
+                          width: double.infinity,
+                          fit: BoxFit.contain,
+                          loadingBuilder: (_, child, progress) =>
+                              progress == null
+                              ? child
+                              : Container(
+                                  height: 140,
+                                  color: Colors.grey[100],
+                                  child: const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                ),
+                          errorBuilder: (_, __, ___) => Container(
+                            height: 80,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.broken_image_outlined,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 24),
                     ...List.generate(q.options.length, (i) {
                       final isSelected = selectedOption == i;

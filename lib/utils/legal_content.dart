@@ -29,7 +29,7 @@ When you register, we collect:
 • Phone number
 • Physical address
 • Department and academic year
-• Role (Student, Professor, Coordinator, HOD, or Principal)
+• Role (Student, Professor, Coordinator, Incharge, or Principal)
 
 1.2 Academic Information
 • Exam attempts and scores
@@ -78,7 +78,7 @@ We retain your personal data for as long as your account is active or as needed 
 ─────────────────────────────────────
 
 We do NOT sell, trade, or rent your personal information. We may share data with:
-• Authorized institution staff (your professors, coordinators, HOD, principal) within the platform as required for academic purposes
+• Authorized institution staff (your professors, coordinators, Incharge, principal) within the platform as required for academic purposes
 • Service providers (Firebase/Google) necessary to operate the app
 • Law enforcement when required by applicable law
 

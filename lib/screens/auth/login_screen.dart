@@ -48,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
               : 'Your registration is pending approval. Please wait for your coordinator to assign a class.';
         } else {
           pendingMsg =
-              'Your account is awaiting approval from the HOD or Principal. You will be notified once approved.';
+              'Your account is awaiting approval from the Incharge or Principal. You will be notified once approved.';
         }
         _showMessage(pendingMsg, isError: false);
         await _auth.logout();
@@ -85,6 +85,8 @@ class _LoginScreenState extends State<LoginScreen> {
       case 'coordinator':
         screen = const CoordinatorDashboard();
         break;
+      case 'ug_incharge':
+      case 'pg_incharge':
       case 'hod':
         screen = const HodDashboard();
         break;

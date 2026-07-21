@@ -7,16 +7,17 @@ class BonafideModel {
   final String year;
   final String semester;
   final String rollNo;
-  final String purpose; // why they need bonafide
-  final String applyDate; // auto-filled, non-editable
-  final String
-  status; // pending_payment / payment_done / pending_approval / approved / rejected
+  final String purpose;
+  final String applyDate;
+  final String status;
   final bool isPaid;
-  final String paymentId;
+  final String paymentId;       // Transaction ID entered by student
+  final String paymentDate;     // Date of payment entered by student
+  final String paymentScreenshotUrl; // Firebase Storage URL of screenshot
   final double charges;
-  final String approvedBy; // Technical staff UID
+  final String approvedBy;
   final String approvedDate;
-  final String pdfUrl; // generated bonafide PDF
+  final String pdfUrl;
   final DateTime createdAt;
 
   BonafideModel({
@@ -33,6 +34,8 @@ class BonafideModel {
     this.status = 'pending_payment',
     this.isPaid = false,
     this.paymentId = '',
+    this.paymentDate = '',
+    this.paymentScreenshotUrl = '',
     this.charges = 50.0,
     this.approvedBy = '',
     this.approvedDate = '',
@@ -40,28 +43,29 @@ class BonafideModel {
     required this.createdAt,
   });
 
-  factory BonafideModel.fromMap(Map<String, dynamic> map, String id) {
-    return BonafideModel(
-      id: id,
-      studentId: map['studentId'] ?? '',
-      studentName: map['studentName'] ?? '',
-      erpId: map['erpId'] ?? '',
-      branch: map['branch'] ?? '',
-      year: map['year'] ?? '',
-      semester: map['semester'] ?? '',
-      rollNo: map['rollNo'] ?? '',
-      purpose: map['purpose'] ?? '',
-      applyDate: map['applyDate'] ?? '',
-      status: map['status'] ?? 'pending_payment',
-      isPaid: map['isPaid'] ?? false,
-      paymentId: map['paymentId'] ?? '',
-      charges: (map['charges'] ?? 50.0).toDouble(),
-      approvedBy: map['approvedBy'] ?? '',
-      approvedDate: map['approvedDate'] ?? '',
-      pdfUrl: map['pdfUrl'] ?? '',
-      createdAt: (map['createdAt'] as dynamic)?.toDate() ?? DateTime.now(),
-    );
-  }
+  factory BonafideModel.fromMap(Map<String, dynamic> map, String id) =>
+      BonafideModel(
+        id: id,
+        studentId: map['studentId'] ?? '',
+        studentName: map['studentName'] ?? '',
+        erpId: map['erpId'] ?? '',
+        branch: map['branch'] ?? '',
+        year: map['year'] ?? '',
+        semester: map['semester'] ?? '',
+        rollNo: map['rollNo'] ?? '',
+        purpose: map['purpose'] ?? '',
+        applyDate: map['applyDate'] ?? '',
+        status: map['status'] ?? 'pending_payment',
+        isPaid: map['isPaid'] ?? false,
+        paymentId: map['paymentId'] ?? '',
+        paymentDate: map['paymentDate'] ?? '',
+        paymentScreenshotUrl: map['paymentScreenshotUrl'] ?? '',
+        charges: (map['charges'] ?? 50.0).toDouble(),
+        approvedBy: map['approvedBy'] ?? '',
+        approvedDate: map['approvedDate'] ?? '',
+        pdfUrl: map['pdfUrl'] ?? '',
+        createdAt: (map['createdAt'] as dynamic)?.toDate() ?? DateTime.now(),
+      );
 
   Map<String, dynamic> toMap() => {
     'studentId': studentId,
@@ -76,6 +80,8 @@ class BonafideModel {
     'status': status,
     'isPaid': isPaid,
     'paymentId': paymentId,
+    'paymentDate': paymentDate,
+    'paymentScreenshotUrl': paymentScreenshotUrl,
     'charges': charges,
     'approvedBy': approvedBy,
     'approvedDate': approvedDate,
@@ -83,21 +89,14 @@ class BonafideModel {
     'createdAt': createdAt,
   };
 
-  // Status display labels
   static String statusLabel(String status) {
     switch (status) {
-      case 'pending_payment':
-        return 'Payment Pending';
-      case 'payment_done':
-        return 'Payment Done — Awaiting Approval';
-      case 'pending_approval':
-        return 'Under Review';
-      case 'approved':
-        return 'Approved — Certificate Ready';
-      case 'rejected':
-        return 'Rejected';
-      default:
-        return status;
+      case 'pending_payment':    return 'Payment Pending';
+      case 'payment_done':       return 'Payment Done — Awaiting Approval';
+      case 'pending_approval':   return 'Under Review';
+      case 'approved':           return 'Approved — Certificate Ready';
+      case 'rejected':           return 'Rejected';
+      default:                   return status;
     }
   }
 }

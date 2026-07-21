@@ -9,7 +9,13 @@ class ExamModel {
   final String status;
   final int totalQuestions;
   final bool isResultPublished;
-  final bool isReExamAllowed; // ← Professor controls re-exam permission
+  final bool isReExamAllowed;
+
+  // Fix 2: sem-wise + all-student targeting
+  final String targetBranch;   // e.g. 'BIO-TECH-UG' or '' for all
+  final String targetYear;     // e.g. 'SY' or ''
+  final String targetSemester; // e.g. 'SEM-III' or ''
+  final bool targetAllStudents; // true = all branches/sems
 
   ExamModel({
     required this.id,
@@ -23,6 +29,10 @@ class ExamModel {
     required this.totalQuestions,
     this.isResultPublished = false,
     this.isReExamAllowed = false,
+    this.targetBranch = '',
+    this.targetYear = '',
+    this.targetSemester = '',
+    this.targetAllStudents = false,
   });
 
   factory ExamModel.fromMap(Map<String, dynamic> map, String id) {
@@ -38,6 +48,10 @@ class ExamModel {
       totalQuestions: map['totalQuestions'] ?? 0,
       isResultPublished: map['isResultPublished'] ?? false,
       isReExamAllowed: map['isReExamAllowed'] ?? false,
+      targetBranch: map['targetBranch'] ?? '',
+      targetYear: map['targetYear'] ?? '',
+      targetSemester: map['targetSemester'] ?? '',
+      targetAllStudents: map['targetAllStudents'] ?? false,
     );
   }
 
@@ -53,10 +67,21 @@ class ExamModel {
       'totalQuestions': totalQuestions,
       'isResultPublished': isResultPublished,
       'isReExamAllowed': isReExamAllowed,
+      'targetBranch': targetBranch,
+      'targetYear': targetYear,
+      'targetSemester': targetSemester,
+      'targetAllStudents': targetAllStudents,
     };
   }
 
-  ExamModel copyWith({bool? isResultPublished, bool? isReExamAllowed}) {
+  ExamModel copyWith({
+    bool? isResultPublished,
+    bool? isReExamAllowed,
+    String? targetBranch,
+    String? targetYear,
+    String? targetSemester,
+    bool? targetAllStudents,
+  }) {
     return ExamModel(
       id: id,
       title: title,
@@ -69,6 +94,21 @@ class ExamModel {
       totalQuestions: totalQuestions,
       isResultPublished: isResultPublished ?? this.isResultPublished,
       isReExamAllowed: isReExamAllowed ?? this.isReExamAllowed,
+      targetBranch: targetBranch ?? this.targetBranch,
+      targetYear: targetYear ?? this.targetYear,
+      targetSemester: targetSemester ?? this.targetSemester,
+      targetAllStudents: targetAllStudents ?? this.targetAllStudents,
     );
+  }
+
+  /// Human-readable target string for display
+  String get targetLabel {
+    if (targetAllStudents) return 'All Students';
+    final parts = [
+      if (targetBranch.isNotEmpty) targetBranch,
+      if (targetYear.isNotEmpty) targetYear,
+      if (targetSemester.isNotEmpty) targetSemester,
+    ];
+    return parts.isEmpty ? 'All Students' : parts.join(' • ');
   }
 }

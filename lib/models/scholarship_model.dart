@@ -21,6 +21,7 @@ class ScholarshipModel {
   final String motherName;
   final String aadharNo;
   final String dob;
+  final String gender;
 
   // NEW FIELDS
   final String
@@ -62,6 +63,7 @@ class ScholarshipModel {
     this.motherName = '',
     this.aadharNo = '',
     this.dob = '',
+    this.gender = '',
     this.formFilledStatus = 'no',
     this.applicationStatus = 'pending',
     this.pdfUrl = '',
@@ -98,6 +100,7 @@ class ScholarshipModel {
         motherName: m['motherName'] ?? '',
         aadharNo: m['aadharNo'] ?? '',
         dob: m['dob'] ?? '',
+        gender: m['gender'] ?? '',
         formFilledStatus: m['formFilledStatus'] ?? 'no',
         applicationStatus: m['applicationStatus'] ?? 'pending',
         pdfUrl: m['pdfUrl'] ?? '',
@@ -132,6 +135,7 @@ class ScholarshipModel {
     'motherName': motherName,
     'aadharNo': aadharNo,
     'dob': dob,
+    'gender': gender,
     'formFilledStatus': formFilledStatus,
     'applicationStatus': applicationStatus,
     'pdfUrl': pdfUrl,

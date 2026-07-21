@@ -9,7 +9,14 @@ import '../exam/exam_start_screen.dart';
 
 class ExamListScreen extends StatefulWidget {
   final String studentId;
-  const ExamListScreen({super.key, required this.studentId});
+  final String branch;
+  final String semester;
+  const ExamListScreen({
+    super.key,
+    required this.studentId,
+    this.branch = '',
+    this.semester = '',
+  });
   @override
   State<ExamListScreen> createState() => _ExamListScreenState();
 }
@@ -47,29 +54,104 @@ class _ExamListScreenState extends State<ExamListScreen>
         ),
         Expanded(
           child: StreamBuilder(
-            stream: _examService.getExams(),
-            builder: (ctx, snap) {
-              if (!snap.hasData) return const LoadingWidget();
-              final all = snap.data!;
-              return TabBarView(
-                controller: _tabCtrl,
-                children: [
-                  _ExamList(
-                    exams: all.where((e) => e.status == 'upcoming').toList(),
-                    studentId: widget.studentId,
-                    examService: _examService,
-                  ),
-                  _ExamList(
-                    exams: all.where((e) => e.status == 'ongoing').toList(),
-                    studentId: widget.studentId,
-                    examService: _examService,
-                  ),
-                  _ExamList(
-                    exams: all.where((e) => e.status == 'completed').toList(),
-                    studentId: widget.studentId,
-                    examService: _examService,
-                  ),
-                ],
+            stream: (widget.branch.isNotEmpty)
+                ? _examService.getExamsForStudent(
+                    branch: widget.branch,
+                    semester: widget.semester,
+                  )
+                : _examService.getExams(),
+            builder: (ctx, examSnap) {
+              if (!examSnap.hasData) return const LoadingWidget();
+              final all = examSnap.data!;
+              return StreamBuilder(
+                stream: _examService.getResultsByStudent(widget.studentId),
+                builder: (ctx2, resultSnap) {
+                  final attemptedExamIds = (resultSnap.data ?? [])
+                      .map((r) => r.examId)
+                      .toSet();
+
+                  // An exam is "completed" for THIS student once they've
+                  // submitted it, even if the exam window is still globally
+                  // 'ongoing' — plus any exam the college has marked
+                  // 'completed' overall.
+                  final completedExams = all
+                      .where(
+                        (e) =>
+                            e.status == 'completed' ||
+                            attemptedExamIds.contains(e.id),
+                      )
+                      .toList();
+                  final ongoingExams = all
+                      .where(
+                        (e) =>
+                            e.status == 'ongoing' &&
+                            !attemptedExamIds.contains(e.id),
+                      )
+                      .toList();
+                  final upcomingExams = all
+                      .where((e) => e.status == 'upcoming')
+                      .toList();
+
+                  return Column(
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.success.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppTheme.success.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.check_circle_outline,
+                              color: AppTheme.success,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'You have completed ${attemptedExamIds.length} of ${all.length} exam(s)',
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.success,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: TabBarView(
+                          controller: _tabCtrl,
+                          children: [
+                            _ExamList(
+                              exams: upcomingExams,
+                              studentId: widget.studentId,
+                              examService: _examService,
+                            ),
+                            _ExamList(
+                              exams: ongoingExams,
+                              studentId: widget.studentId,
+                              examService: _examService,
+                            ),
+                            _ExamList(
+                              exams: completedExams,
+                              studentId: widget.studentId,
+                              examService: _examService,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
               );
             },
           ),
@@ -150,9 +232,10 @@ class _ExamCardState extends State<_ExamCard> {
     );
 
     if (result != null) {
-      // Has a result — check if re-exam is granted
-      if (widget.exam.isReExamAllowed) {
-        // Also check enrollment reExamGranted flag
+      // Has a result — re-exam is only granted to FAILED students
+      // (percentage < 75), even when the exam-level re-exam flag is on.
+      final failed = result.percentage < 75;
+      if (widget.exam.isReExamAllowed && failed) {
         if (mounted) setState(() => _state = _CardState.reExamGranted);
       } else {
         if (mounted) setState(() => _state = _CardState.attempted);
@@ -292,6 +375,52 @@ class _ExamCardState extends State<_ExamCard> {
         );
 
       case _CardState.enrolled:
+        final now = DateTime.now();
+        final examDay = DateTime(
+          widget.exam.examDate.year,
+          widget.exam.examDate.month,
+          widget.exam.examDate.day,
+        );
+        final today = DateTime(now.year, now.month, now.day);
+        if (today.isBefore(examDay)) {
+          // Too early — exam hasn't opened yet.
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: AppTheme.warning.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppTheme.warning.withOpacity(0.4),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.event_busy,
+                      color: AppTheme.warning,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Opens on ${DateFormat('dd MMM yyyy').format(widget.exam.examDate)}',
+                      style: const TextStyle(
+                        color: AppTheme.warning,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        }
         return ElevatedButton.icon(
           onPressed: () => Navigator.push(
             context,

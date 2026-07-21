@@ -5,7 +5,8 @@ class AppConstants {
     'student',
     'professor',
     'coordinator',
-    'hod',
+    'ug_incharge',
+    'pg_incharge',
     'non_technical',
     'technical',
   ];
@@ -15,7 +16,8 @@ class AppConstants {
     'student',
     'professor',
     'coordinator',
-    'hod',
+    'ug_incharge',
+    'pg_incharge',
     'principal',
     'non_technical',
     'technical',
@@ -23,20 +25,37 @@ class AppConstants {
 
   static const Map<String, String> roleLabels = {
     'student': 'Student',
-    'professor': 'Professor',
-    'coordinator': 'Class Coordinator',
-    'hod': 'HOD',
+    'professor': 'Course Teacher',
+    'coordinator': 'Advisor',
+    'ug_incharge': 'UG Incharge',
+    'pg_incharge': 'PG Incharge',
+    'hod': 'UG Incharge / PG Incharge', // legacy — old accounts only
     'principal': 'Principal',
     'non_technical': 'Non-Technical Staff',
-    'technical': 'Technical Staff (Admin)',
+    'technical': 'Education Section',
   };
 
   static String roleLabel(String role) => roleLabels[role] ?? role;
 
-  // Staff roles that need HOD/Principal approval
+  /// The single branch an Incharge role is scoped to, or '' if not scoped
+  /// (e.g. legacy 'hod' accounts still see both).
+  static String branchForInchargeRole(String role) {
+    switch (role) {
+      case 'ug_incharge':
+        return 'BIO-TECH-UG';
+      case 'pg_incharge':
+        return 'BIO-TECH-PG';
+      default:
+        return ''; // legacy 'hod' — unscoped
+    }
+  }
+
+  // Staff roles that need Incharge/Principal approval
   static const List<String> staffRoles = [
     'professor',
     'coordinator',
+    'ug_incharge',
+    'pg_incharge',
     'hod',
     'non_technical',
     'technical',

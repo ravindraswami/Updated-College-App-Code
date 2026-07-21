@@ -10,12 +10,32 @@ class SubjectService {
     await _db.collection(_col).add(subject.toMap());
   }
 
+  // Incharge: assign / change the Course Teacher for a subject
+  Future<void> assignTeacher(
+    String subjectId,
+    String teacherId,
+    String teacherName,
+  ) async {
+    await _db.collection(_col).doc(subjectId).update({
+      'teacherId': teacherId,
+      'teacherName': teacherName,
+    });
+  }
+
+  // Professor / Technical: update fees for a subject
+  Future<void> updateFees(String subjectId, double regularFee, double backlogFee) async {
+    await _db.collection(_col).doc(subjectId).update({
+      'regularFee': regularFee,
+      'backlogFee': backlogFee,
+    });
+  }
+
   // Professor: delete a subject
   Future<void> deleteSubject(String subjectId) async {
     await _db.collection(_col).doc(subjectId).delete();
   }
 
-  // Get all subjects (for HOD, Principal, all staff)
+  // Get all subjects (for Incharge, Principal, all staff)
   Stream<List<SubjectModel>> getAllSubjects() {
     return _db
         .collection(_col)
@@ -48,7 +68,6 @@ class SubjectService {
     String branch,
     String year,
   ) async {
-    // For backlog, return all subjects for the branch in earlier semesters
     final semMap = {
       'FY': ['SEM-I', 'SEM-II'],
       'SY': ['SEM-I', 'SEM-II', 'SEM-III', 'SEM-IV'],

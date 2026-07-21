@@ -27,11 +27,22 @@ class CharacterCertService {
   }
 
   // Payment done → status = pending_technical
-  Future<void> makePayment(String certId) async {
+  Future<void> makePayment(String certId) => markPaymentDone(certId, '');
+
+  Future<void> markPaymentDone(
+    String certId,
+    String transactionId, {
+    String paymentDate = '',
+    String screenshotUrl = '',
+  }) async {
     await _db.collection(_col).doc(certId).update({
       'isPaid': true,
       'status': 'pending_technical',
-      'paymentId': 'PAY_CC_${DateTime.now().millisecondsSinceEpoch}',
+      'paymentId': transactionId.isNotEmpty
+          ? transactionId
+          : 'PAY_CC_\${DateTime.now().millisecondsSinceEpoch}',
+      'paymentDate': paymentDate,
+      'paymentScreenshotUrl': screenshotUrl,
     });
   }
 
@@ -40,6 +51,21 @@ class CharacterCertService {
     return _db
         .collection(_col)
         .where('status', isEqualTo: 'pending_technical')
+        .snapshots()
+        .map((s) {
+          final list = s.docs
+              .map((d) => CharacterCertModel.fromMap(d.data(), d.id))
+              .toList();
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
+        });
+  }
+
+  // Technical: get approved certs (for history / print list)
+  Stream<List<CharacterCertModel>> getApprovedCerts() {
+    return _db
+        .collection(_col)
+        .where('status', isEqualTo: 'approved')
         .snapshots()
         .map((s) {
           final list = s.docs

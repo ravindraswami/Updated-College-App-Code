@@ -35,7 +35,7 @@ class NoteService {
     });
   }
 
-  // All notes (for professors / HOD / Principal)
+  // All notes (for professors / Incharge / Principal)
   Stream<List<NoteModel>> getNotes() {
     return _db
         .collection('notes')

@@ -66,6 +66,8 @@ class AppTheme {
     'student': const Color(0xFF2563EB),
     'professor': const Color(0xFF7C3AED),
     'coordinator': const Color(0xFF0891B2),
+    'ug_incharge': const Color(0xFF059669),
+    'pg_incharge': const Color(0xFF0D9488),
     'hod': const Color(0xFF059669),
     'principal': const Color(0xFFDC2626),
   };
@@ -76,6 +78,8 @@ class AppTheme {
     'student': Icons.school,
     'professor': Icons.person_outline,
     'coordinator': Icons.people,
+    'ug_incharge': Icons.manage_accounts,
+    'pg_incharge': Icons.manage_accounts,
     'hod': Icons.manage_accounts,
     'principal': Icons.admin_panel_settings,
   };

@@ -3,8 +3,9 @@ import 'package:intl/intl.dart';
 import '../../models/user_model.dart';
 import '../../models/tc_model.dart';
 import '../../services/tc_service.dart';
+import '../../services/fee_config_service.dart';
 import '../../utils/app_theme.dart';
-import 'tc_certificate_screen.dart';
+import 'payment_screen.dart';
 
 class TcScreen extends StatelessWidget {
   final UserModel student;
@@ -17,8 +18,9 @@ class TcScreen extends StatelessWidget {
       stream: svc.getStudentTcs(student.id),
       builder: (context, snap) {
         final all = snap.data ?? [];
-        final approved = all.where((r) => r.status == 'approved').toList();
+        // Student sees only pending/processing — approved TCs are printed by Technical
         final others = all.where((r) => r.status != 'approved').toList();
+        final hasApproved = all.any((r) => r.status == 'approved');
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -61,7 +63,11 @@ class TcScreen extends StatelessWidget {
                       text: 'Request goes directly to Technical Staff',
                     ),
                     _Step(n: '3', text: 'Technical Staff reviews and approves'),
-                    _Step(n: '4', text: 'Download your Transfer Certificate'),
+                    _Step(
+                      n: '4',
+                      text:
+                          'Collect your Transfer Certificate from Technical Department',
+                    ),
                   ],
                 ),
               ),
@@ -82,18 +88,68 @@ class TcScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
 
-              if (approved.isNotEmpty) ...[
-                _Label(
-                  icon: Icons.verified,
-                  label: 'Approved — Ready to Download',
-                  color: AppTheme.success,
+              // Collect banner — shown when TC is approved
+              if (hasApproved)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.success.withOpacity(0.07),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: AppTheme.success.withOpacity(0.25),
+                    ),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.verified, color: AppTheme.success, size: 20),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Your Transfer Certificate has been approved!\nPlease collect it from the Technical Department.',
+                          style: TextStyle(
+                            color: AppTheme.success,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.success.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: AppTheme.success.withOpacity(0.15),
+                    ),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: AppTheme.success,
+                        size: 18,
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Once approved, collect your Transfer Certificate from the Technical Department.',
+                          style: TextStyle(
+                            color: AppTheme.success,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                ...approved.map((r) => _ApprovedCard(tc: r, student: student)),
-                const SizedBox(height: 20),
-              ],
 
               if (others.isNotEmpty) ...[
                 _Label(
@@ -148,7 +204,17 @@ class _TcFormScreen extends StatefulWidget {
 class _TcFormScreenState extends State<_TcFormScreen> {
   final _lastExamCtrl = TextEditingController();
   final _reasonCtrl = TextEditingController();
+  final _feeSvc = FeeConfigService();
   bool _paying = false;
+  double _charges = FeeConfigService.defaultTcFee;
+
+  @override
+  void initState() {
+    super.initState();
+    _feeSvc.getFees().then((fees) {
+      if (mounted) setState(() => _charges = fees['tcFee']!);
+    });
+  }
 
   @override
   void dispose() {
@@ -178,18 +244,18 @@ class _TcFormScreenState extends State<_TcFormScreen> {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         title: const Text('TC Payment'),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.receipt_long, size: 56, color: AppTheme.primary),
-            SizedBox(height: 12),
-            Text(
+            const Icon(Icons.receipt_long, size: 56, color: AppTheme.primary),
+            const SizedBox(height: 12),
+            const Text(
               'TC Charges',
               style: TextStyle(color: Colors.grey, fontSize: 13),
             ),
             Text(
-              '₹100',
-              style: TextStyle(
+              '₹${_charges.toStringAsFixed(0)}',
+              style: const TextStyle(
                 fontSize: 36,
                 fontWeight: FontWeight.bold,
                 color: AppTheme.primary,
@@ -210,7 +276,7 @@ class _TcFormScreenState extends State<_TcFormScreen> {
           ),
           ElevatedButton.icon(
             icon: const Icon(Icons.check_circle_outline, size: 16),
-            label: const Text('Pay ₹100'),
+            label: Text('Pay ₹${_charges.toStringAsFixed(0)}'),
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
             onPressed: () async {
               Navigator.pop(ctx);
@@ -222,12 +288,12 @@ class _TcFormScreenState extends State<_TcFormScreen> {
     );
   }
 
-  // Create TC record + mark as paid in one go
+  // Create TC record → navigate to PaymentScreen
   Future<void> _submitAndPay() async {
     setState(() => _paying = true);
     final s = widget.student;
     try {
-      // 1. Create record
+      // 1. Create record (status = pending_payment)
       final docRef = await widget.svc.applyTcReturnRef(
         TcModel(
           id: '',
@@ -247,22 +313,23 @@ class _TcFormScreenState extends State<_TcFormScreen> {
           dateOfAdmission: DateFormat('dd/MM/yyyy').format(s.createdAt),
           lastExamPassed: _lastExamCtrl.text.trim(),
           reasonForLeaving: _reasonCtrl.text.trim(),
+          charges: _charges,
           createdAt: DateTime.now(),
         ),
       );
-      // 2. Immediately mark payment done → pending_technical
-      await widget.svc.makePayment(docRef);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Payment successful! TC request sent to Technical Staff.',
+      // 2. Navigate to PaymentScreen with real SBI link
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PaymentScreen(
+            requestId: docRef,
+            amount: _charges,
+            studentName: s.nameAsPerHsc.isNotEmpty ? s.nameAsPerHsc : s.name,
+            paymentFor: PaymentFor.tc,
           ),
-          backgroundColor: AppTheme.success,
-          duration: Duration(seconds: 4),
         ),
       );
-      Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -370,7 +437,7 @@ class _TcFormScreenState extends State<_TcFormScreen> {
                         ),
                       )
                     : const Icon(Icons.payment),
-                label: Text(_paying ? 'Processing...' : 'Pay ₹100 & Submit'),
+                label: Text(_paying ? 'Processing...' : 'Pay ₹${_charges.toStringAsFixed(0)} & Submit'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.success,
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -443,7 +510,7 @@ class _StatusCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              TcModel.statusDescription(tc.status),
+              TcModel.statusLabel(tc.status),
               style: const TextStyle(color: Colors.grey, fontSize: 12),
             ),
             if (tc.reasonForLeaving.isNotEmpty)
@@ -451,71 +518,6 @@ class _StatusCard extends StatelessWidget {
                 'Reason: ${tc.reasonForLeaving}',
                 style: const TextStyle(color: Colors.grey, fontSize: 12),
               ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Approved card ─────────────────────────────────────────────
-class _ApprovedCard extends StatelessWidget {
-  final TcModel tc;
-  final UserModel student;
-  const _ApprovedCard({required this.tc, required this.student});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: AppTheme.success.withOpacity(0.05),
-      margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: AppTheme.success),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.verified, color: AppTheme.success),
-                SizedBox(width: 8),
-                Text(
-                  'Transfer Certificate — Approved',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.success,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            if (tc.approvedDate.isNotEmpty)
-              Text(
-                'Approved on: ${tc.approvedDate.substring(0, 10)}',
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
-              ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.download),
-                label: const Text('View & Download TC'),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        TcCertificateScreen(tc: tc, student: student),
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.success,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
           ],
         ),
       ),

@@ -33,11 +33,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _abcIdCtrl = TextEditingController();
   final _aadharNoCtrl = TextEditingController();
   String? _dob;
+  String? _admissionDate;
   final _mobileCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _obscurePass = true;
   String? _maritalStatus;
+  String? _gender;
 
   // Address
   final _addressCtrl = TextEditingController();
@@ -100,6 +102,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  Future<void> _pickAdmissionDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1990),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(
+        () => _admissionDate = DateFormat('dd/MM/yyyy').format(picked),
+      );
+    }
+  }
+
   // ── Register ──────────────────────────────────────────────
   Future<void> _register() async {
     if (_isStudent) {
@@ -137,8 +153,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         abcId: _abcIdCtrl.text.trim(),
         aadharNo: _aadharNoCtrl.text.trim(),
         dob: _dob ?? '',
+        admissionDate: _admissionDate ?? '',
         mobile: _mobileCtrl.text.trim(),
         maritalStatus: _maritalStatus ?? '',
+        gender: _gender ?? '',
         address: _addressCtrl.text.trim(),
         state: _state ?? '',
         district: _district ?? '',
@@ -158,7 +176,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _showSnack(
         _isStudent
             ? 'Registration submitted! Your class coordinator will review and approve your account.\nERP ID: ${user?.erpId ?? ""}'
-            : 'Registration submitted. Awaiting HOD/Principal approval.',
+            : 'Registration submitted. Awaiting Incharge/Principal approval.',
         isError: false,
         duration: 6,
       );
@@ -561,6 +579,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         const SizedBox(height: 14),
 
+        // 9b. Year of Admission
+        GestureDetector(
+          onTap: _pickAdmissionDate,
+          child: AbsorbPointer(
+            child: TextFormField(
+              decoration: InputDecoration(
+                labelText: 'Year of Admission',
+                prefixIcon: const Icon(Icons.school_outlined),
+                hintText: 'dd/MM/yyyy',
+                suffixIcon: const Icon(Icons.calendar_today, size: 18),
+              ),
+              controller: TextEditingController(text: _admissionDate ?? ''),
+              validator: (_) => (_admissionDate == null || _admissionDate!.isEmpty)
+                  ? 'Please select year of admission.'
+                  : null,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+
         // 10. Mobile
         TextFormField(
           controller: _mobileCtrl,
@@ -627,6 +665,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
               .toList(),
           onChanged: (v) => setState(() => _maritalStatus = v),
           validator: (v) => v == null ? 'Please select marital status.' : null,
+        ),
+        const SizedBox(height: 14),
+
+        // 12b. Gender
+        _DropdownField(
+          label: 'Gender',
+          icon: Icons.wc_outlined,
+          value: _gender,
+          hint: 'Select gender',
+          items: const ['Male', 'Female', 'Other']
+              .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+              .toList(),
+          onChanged: (v) => setState(() => _gender = v),
+          validator: (v) => v == null ? 'Please select gender.' : null,
         ),
         const SizedBox(height: 20),
 
@@ -905,7 +957,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Your account requires approval from HOD or Principal before you can login.',
+                  'Your account requires approval from Incharge or Principal before you can login.',
                   style: TextStyle(color: AppTheme.warning, fontSize: 12),
                 ),
               ),

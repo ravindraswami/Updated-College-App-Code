@@ -96,7 +96,7 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
       case 2:
         return const NotesScreen();
       case 3:
-        return SubjectManagementScreen(professor: _user!);
+        return SubjectManagementScreen(user: _user!, canAdd: false);
       default:
         return ExamManagementScreen(professorId: _user!.id);
     }

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import '../../models/user_model.dart';
 import '../../models/scholarship_model.dart';
 import '../../services/scholarship_service.dart';
@@ -121,9 +125,156 @@ class _ScholarshipApplyScreenState extends State<ScholarshipApplyScreen> {
 }
 
 // ── Scholarship status card ───────────────────────────────────
-class _ScholarshipCard extends StatelessWidget {
+class _ScholarshipCard extends StatefulWidget {
   final ScholarshipModel req;
   const _ScholarshipCard(this.req);
+  @override
+  State<_ScholarshipCard> createState() => _ScholarshipCardState();
+}
+
+class _ScholarshipCardState extends State<_ScholarshipCard> {
+  ScholarshipModel get req => widget.req;
+  bool _printing = false;
+
+  Future<void> _printApproval() async {
+    setState(() => _printing = true);
+    try {
+      final doc = pw.Document();
+      doc.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(36),
+          build: (ctx) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.Text(
+                'SCHOLARSHIP APPROVAL LETTER',
+                style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Container(width: 80, height: 2, color: PdfColors.green800),
+              pw.SizedBox(height: 16),
+              pw.Table(
+                border: pw.TableBorder.all(
+                  color: PdfColors.grey400,
+                  width: 0.5,
+                ),
+                columnWidths: {
+                  0: const pw.FixedColumnWidth(160),
+                  1: const pw.FlexColumnWidth(),
+                },
+                children:
+                    [
+                      ['ERP / Roll No.', req.erpId],
+                      ['Scholarship Type', req.scholarshipType],
+                      ['Religion / Caste', '${req.religion} / ${req.caste}'],
+                      ['Caste Category', req.casteCategory],
+                      [
+                        'Income (Annual)',
+                        ((req as dynamic).annualIncome ?? '').toString(),
+                      ],
+                      [
+                        'Form Filled',
+                        req.formFilledStatus == 'yes' ? 'Yes' : 'No',
+                      ],
+                      ['Application Status', 'APPROVED ✓'],
+                      ['Academic Year', req.year],
+                    ].map((row) {
+                      return pw.TableRow(
+                        children: [
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 5,
+                            ),
+                            child: pw.Text(
+                              row[0],
+                              style: pw.TextStyle(
+                                fontWeight: pw.FontWeight.bold,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 5,
+                            ),
+                            child: pw.Text(
+                              row[1].isNotEmpty ? row[1] : '—',
+                              style: const pw.TextStyle(fontSize: 10),
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+              ),
+              pw.SizedBox(height: 40),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    children: [
+                      pw.Container(
+                        width: 100,
+                        height: 1,
+                        color: PdfColors.black,
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        'Student Signature',
+                        style: const pw.TextStyle(
+                          fontSize: 9,
+                          color: PdfColors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                  pw.Column(
+                    children: [
+                      pw.Container(
+                        width: 130,
+                        height: 1,
+                        color: PdfColors.black,
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        'Principal / Authorized Signatory',
+                        style: const pw.TextStyle(
+                          fontSize: 9,
+                          color: PdfColors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 20),
+              pw.Divider(color: PdfColors.grey300),
+              pw.Text(
+                'Generated via Smart ERP • ${DateFormat('dd MMM yyyy').format(DateTime.now())}',
+                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey),
+              ),
+            ],
+          ),
+        ),
+      );
+      final bytes = await doc.save();
+      await Printing.layoutPdf(onLayout: (_) async => bytes);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -230,6 +381,36 @@ class _ScholarshipCard extends StatelessWidget {
                 child: Text(
                   'Rejection reason: ${req.technicalRemarks}',
                   style: const TextStyle(color: AppTheme.error, fontSize: 12),
+                ),
+              ),
+            ],
+
+            // Print button for approved scholarships
+            if (req.status == 'approved') ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: _printing
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.print, size: 16),
+                  label: Text(
+                    _printing
+                        ? 'Preparing PDF...'
+                        : 'Print / Download Approval Letter',
+                  ),
+                  onPressed: _printing ? null : _printApproval,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.success,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
                 ),
               ),
             ],
@@ -384,15 +565,15 @@ class _ScholarshipFormScreenState extends State<_ScholarshipFormScreen> {
   bool _isSubmitting = false;
 
   static const _scholarshipTypes = [
-    'Government Scholarship (EBC)',
-    'OBC Scholarship',
-    'SC/ST Scholarship',
-    'Merit-based Scholarship',
-    'Minority Scholarship',
-    'Freeship Card',
-    'Central Sector Scholarship',
-    'Post Matric Scholarship',
-    'Other',
+    'EBC Punjabrao',
+    'EBC Rajarshi Shahu Maharaj',
+    'OBC GOI',
+    'OBC Freeship',
+    'SC/ST GOI',
+    'SC/ST Freeship',
+    'VJNT GOI',
+    'VJNT Freeship',
+    'Swadhar Dr. Babasaheb Ambedkar',
   ];
 
   Future<void> _pickPdf() async {
@@ -789,7 +970,7 @@ class _ScholarshipFormScreenState extends State<_ScholarshipFormScreen> {
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'Student  →  Class Coordinator  →  Technical Staff',
+                      'Student  →  Advisor  →  Administrative',
                       style: TextStyle(fontSize: 13),
                     ),
                     SizedBox(height: 4),

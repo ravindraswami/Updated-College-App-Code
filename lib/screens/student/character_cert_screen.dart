@@ -3,8 +3,9 @@ import 'package:intl/intl.dart';
 import '../../models/user_model.dart';
 import '../../models/character_cert_model.dart';
 import '../../services/character_cert_service.dart';
+import '../../services/fee_config_service.dart';
 import '../../utils/app_theme.dart';
-import 'character_certificate_screen.dart';
+import 'payment_screen.dart';
 
 class CharacterCertScreen extends StatelessWidget {
   final UserModel student;
@@ -17,8 +18,9 @@ class CharacterCertScreen extends StatelessWidget {
       stream: svc.getStudentCerts(student.id),
       builder: (context, snap) {
         final all = snap.data ?? [];
-        final approved = all.where((r) => r.status == 'approved').toList();
+        // Student sees only pending/processing — approved certs printed by Technical
         final others = all.where((r) => r.status != 'approved').toList();
+        final hasApproved = all.any((r) => r.status == 'approved');
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -56,12 +58,9 @@ class CharacterCertScreen extends StatelessWidget {
                     ),
                     SizedBox(height: 8),
                     _Step(n: '1', text: 'Fill purpose and pay ₹50 fee'),
-                    _Step(
-                      n: '2',
-                      text: 'Request goes directly to Technical Staff',
-                    ),
+                    _Step(n: '2', text: 'Request goes directly to Technical Staff'),
                     _Step(n: '3', text: 'Technical Staff reviews and approves'),
-                    _Step(n: '4', text: 'Download your Character Certificate'),
+                    _Step(n: '4', text: 'Collect your Character Certificate from Technical Department'),
                   ],
                 ),
               ),
@@ -82,20 +81,56 @@ class CharacterCertScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
 
-              if (approved.isNotEmpty) ...[
-                _Label(
-                  icon: Icons.verified,
-                  label: 'Approved — Ready to Download',
-                  color: AppTheme.success,
+              // Collect banner
+              if (hasApproved)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.success.withOpacity(0.07),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.success.withOpacity(0.25)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.verified, color: AppTheme.success, size: 20),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Your Character Certificate has been approved!\nPlease collect it from the Technical Department.',
+                          style: TextStyle(
+                              color: AppTheme.success,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.success.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.success.withOpacity(0.15)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.info_outline, color: AppTheme.success, size: 18),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Once approved, collect your Character Certificate from the Technical Department.',
+                          style: TextStyle(color: AppTheme.success, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                ...approved.map(
-                  (r) => _ApprovedCard(cert: r, student: student),
-                ),
-                const SizedBox(height: 20),
-              ],
 
               if (others.isNotEmpty) ...[
                 _Label(
@@ -149,8 +184,18 @@ class _CcFormScreen extends StatefulWidget {
 
 class _CcFormScreenState extends State<_CcFormScreen> {
   final _purposeCtrl = TextEditingController();
+  final _feeSvc = FeeConfigService();
   String _conductRemark = 'Good';
   bool _paying = false;
+  double _charges = FeeConfigService.defaultCharacterFee;
+
+  @override
+  void initState() {
+    super.initState();
+    _feeSvc.getFees().then((fees) {
+      if (mounted) setState(() => _charges = fees['characterFee']!);
+    });
+  }
 
   @override
   void dispose() {
@@ -177,25 +222,25 @@ class _CcFormScreenState extends State<_CcFormScreen> {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         title: const Text('Character Certificate Payment'),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.workspace_premium, size: 56, color: AppTheme.primary),
-            SizedBox(height: 12),
-            Text(
+            const Icon(Icons.workspace_premium, size: 56, color: AppTheme.primary),
+            const SizedBox(height: 12),
+            const Text(
               'Certificate Charges',
               style: TextStyle(color: Colors.grey, fontSize: 13),
             ),
             Text(
-              '₹50',
-              style: TextStyle(
+              '₹${_charges.toStringAsFixed(0)}',
+              style: const TextStyle(
                 fontSize: 36,
                 fontWeight: FontWeight.bold,
                 color: AppTheme.primary,
               ),
             ),
-            SizedBox(height: 10),
-            Text(
+            const SizedBox(height: 10),
+            const Text(
               'After payment your request will go directly\nto the Technical Staff for review.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: Colors.grey),
@@ -209,7 +254,7 @@ class _CcFormScreenState extends State<_CcFormScreen> {
           ),
           ElevatedButton.icon(
             icon: const Icon(Icons.check_circle_outline, size: 16),
-            label: const Text('Pay ₹50'),
+            label: Text('Pay ₹${_charges.toStringAsFixed(0)}'),
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
             onPressed: () async {
               Navigator.pop(ctx);
@@ -225,7 +270,7 @@ class _CcFormScreenState extends State<_CcFormScreen> {
     setState(() => _paying = true);
     final s = widget.student;
     try {
-      // 1. Create record and get doc ID
+      // 1. Create record (status = pending_payment)
       final docRef = await widget.svc.applyCertReturnRef(
         CharacterCertModel(
           id: '',
@@ -239,20 +284,23 @@ class _CcFormScreenState extends State<_CcFormScreen> {
           dob: s.dob,
           conductRemark: _conductRemark,
           purpose: _purposeCtrl.text.trim(),
+          charges: _charges,
           createdAt: DateTime.now(),
         ),
       );
-      // 2. Immediately mark payment → pending_technical
-      await widget.svc.makePayment(docRef);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Payment successful! Request sent to Technical Staff.'),
-          backgroundColor: AppTheme.success,
-          duration: Duration(seconds: 4),
+      // 2. Navigate to PaymentScreen with real SBI link
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PaymentScreen(
+            requestId: docRef,
+            amount: _charges,
+            studentName: s.nameAsPerHsc.isNotEmpty ? s.nameAsPerHsc : s.name,
+            paymentFor: PaymentFor.character,
+          ),
         ),
       );
-      Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -358,7 +406,7 @@ class _CcFormScreenState extends State<_CcFormScreen> {
                         ),
                       )
                     : const Icon(Icons.payment),
-                label: Text(_paying ? 'Processing...' : 'Pay ₹50 & Submit'),
+                label: Text(_paying ? 'Processing...' : 'Pay ₹${_charges.toStringAsFixed(0)} & Submit'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.success,
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -438,72 +486,6 @@ class _StatusCard extends StatelessWidget {
                 'Purpose: ${cert.purpose}',
                 style: const TextStyle(color: Colors.grey, fontSize: 12),
               ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Approved card ─────────────────────────────────────────────
-class _ApprovedCard extends StatelessWidget {
-  final CharacterCertModel cert;
-  final UserModel student;
-  const _ApprovedCard({required this.cert, required this.student});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: AppTheme.success.withOpacity(0.05),
-      margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: AppTheme.success),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.verified, color: AppTheme.success),
-                SizedBox(width: 8),
-                Text(
-                  'Character Certificate — Approved',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.success,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Conduct: ${cert.conductRemark}',
-              style: const TextStyle(color: Colors.grey, fontSize: 12),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.workspace_premium),
-                label: const Text('View & Download Certificate'),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CharacterCertificateScreen(
-                      cert: cert,
-                      student: student,
-                    ),
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.success,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
           ],
         ),
       ),

@@ -29,7 +29,7 @@ class UserService {
     return UserModel.fromMap(doc.data()!, doc.id);
   }
 
-  // All approved students in a class (for HOD / Professor view)
+  // All approved students in a class (for Incharge / Professor view)
   Stream<List<UserModel>> getStudentsByClass(String classId) {
     return _db
         .collection('users')
@@ -80,7 +80,7 @@ class UserService {
     await _db.collection('users').doc(userId).update({'isApproved': false});
   }
 
-  // HOD: assign class + slot to a coordinator
+  // Incharge: assign class + slot to a coordinator
   Future<void> assignClassToCoordinator({
     required String coordinatorId,
     required String classId,
@@ -96,7 +96,7 @@ class UserService {
     });
   }
 
-  // HOD: remove class from coordinator
+  // Incharge: remove class from coordinator
   Future<void> removeClassFromCoordinator(String coordinatorId) async {
     await _db.collection('users').doc(coordinatorId).update({
       'classId': '',

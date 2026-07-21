@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../services/exam_service.dart';
@@ -18,7 +17,9 @@ class ExamManagementScreen extends StatelessWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => CreateExamScreen(professorId: professorId)),
+          MaterialPageRoute(
+            builder: (_) => CreateExamScreen(professorId: professorId),
+          ),
         ),
         backgroundColor: AppTheme.secondary,
         icon: const Icon(Icons.add),
@@ -29,11 +30,16 @@ class ExamManagementScreen extends StatelessWidget {
         builder: (ctx, snap) {
           if (!snap.hasData) return const LoadingWidget();
           final exams = snap.data!;
-          if (exams.isEmpty) return const EmptyWidget(message: 'No exams created yet\nTap + to create one', icon: Icons.quiz_outlined);
+          if (exams.isEmpty)
+            return const EmptyWidget(
+              message: 'No exams created yet\nTap + to create one',
+              icon: Icons.quiz_outlined,
+            );
           return ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: exams.length,
-            itemBuilder: (_, i) => _ExamManagementCard(exam: exams[i], professorId: professorId),
+            itemBuilder: (_, i) =>
+                _ExamManagementCard(exam: exams[i], professorId: professorId),
           );
         },
       ),
@@ -51,9 +57,14 @@ class _ExamManagementCard extends StatelessWidget {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Delete Exam?'),
-        content: Text('Delete "${exam.title}"? This also removes all questions.'),
+        content: Text(
+          'Delete "${exam.title}"? This also removes all questions.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
@@ -74,46 +85,123 @@ class _ExamManagementCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [
-              Expanded(
-                child: Text(exam.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
-              PopupMenuButton(
-                itemBuilder: (_) => [
-                  const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit, size: 18), SizedBox(width: 8), Text('Edit')])),
-                  const PopupMenuItem(value: 'questions', child: Row(children: [Icon(Icons.quiz, size: 18), SizedBox(width: 8), Text('Questions')])),
-                  const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete, size: 18, color: Colors.red), SizedBox(width: 8), Text('Delete', style: TextStyle(color: Colors.red))])),
-                ],
-                onSelected: (v) {
-                  if (v == 'delete') _deleteExam(context);
-                  if (v == 'edit') Navigator.push(context, MaterialPageRoute(builder: (_) => CreateExamScreen(professorId: professorId, editExam: exam)));
-                  if (v == 'questions') Navigator.push(context, MaterialPageRoute(builder: (_) => AddQuestionsScreen(exam: exam)));
-                },
-              ),
-            ]),
-            Text(exam.subject, style: const TextStyle(color: Colors.grey)),
-            const SizedBox(height: 12),
-            Row(children: [
-              _chip(Icons.calendar_today, DateFormat('dd MMM yyyy').format(exam.examDate)),
-              const SizedBox(width: 8),
-              _chip(Icons.timer, '${exam.durationMinutes} min'),
-              const SizedBox(width: 8),
-              _chip(Icons.quiz, '${exam.totalQuestions} Qs'),
-            ]),
-            const SizedBox(height: 8),
-            Row(children: [
-              _chip(Icons.currency_rupee, exam.price.toStringAsFixed(0)),
-              const Spacer(),
-              OutlinedButton.icon(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => AddQuestionsScreen(exam: exam)),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    exam.title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
-                icon: const Icon(Icons.add_circle_outline, size: 16),
-                label: const Text('Add Questions'),
-                style: OutlinedButton.styleFrom(foregroundColor: AppTheme.secondary),
-              ),
-            ]),
+                PopupMenuButton(
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 18),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'questions',
+                      child: Row(
+                        children: [
+                          Icon(Icons.quiz, size: 18),
+                          SizedBox(width: 8),
+                          Text('Questions'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 18, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
+                  onSelected: (v) {
+                    if (v == 'delete') _deleteExam(context);
+                    if (v == 'edit')
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CreateExamScreen(
+                            professorId: professorId,
+                            editExam: exam,
+                          ),
+                        ),
+                      );
+                    if (v == 'questions')
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AddQuestionsScreen(exam: exam),
+                        ),
+                      );
+                  },
+                ),
+              ],
+            ),
+            Text(exam.subject, style: const TextStyle(color: Colors.grey)),
+            const SizedBox(height: 4),
+            // Fix 2: show who this exam targets
+            Row(
+              children: [
+                const Icon(
+                  Icons.group_outlined,
+                  size: 13,
+                  color: Colors.blueGrey,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  exam.targetLabel,
+                  style: const TextStyle(fontSize: 11, color: Colors.blueGrey),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _chip(
+                  Icons.calendar_today,
+                  DateFormat('dd MMM yyyy').format(exam.examDate),
+                ),
+                const SizedBox(width: 8),
+                _chip(Icons.timer, '${exam.durationMinutes} min'),
+                const SizedBox(width: 8),
+                _chip(Icons.quiz, '${exam.totalQuestions} Qs'),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _chip(Icons.currency_rupee, exam.price.toStringAsFixed(0)),
+                const Spacer(),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AddQuestionsScreen(exam: exam),
+                    ),
+                  ),
+                  icon: const Icon(Icons.add_circle_outline, size: 16),
+                  label: const Text('Add Questions'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.secondary,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),

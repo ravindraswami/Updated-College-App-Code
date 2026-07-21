@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/user_service.dart';
 import '../models/user_model.dart';
 import '../utils/app_theme.dart';
+import '../utils/academic_data.dart';
 import 'common_widgets.dart';
 
 class StudentListWidget extends StatelessWidget {
@@ -142,10 +143,20 @@ class _StudentCard extends StatelessWidget {
                           ),
                         ),
                       const SizedBox(width: 6),
-                      // Year
+                      // Branch (full name)
+                      if (student.branch.isNotEmpty)
+                        Text(
+                          AcademicData.branchFullLabel(student.branch),
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 11,
+                          ),
+                        ),
+                      const SizedBox(width: 6),
+                      // Year (full form, e.g. First Year)
                       if (student.year.isNotEmpty)
                         Text(
-                          student.year,
+                          AcademicData.yearFullLabel(student.year),
                           style: const TextStyle(
                             color: Colors.grey,
                             fontSize: 11,

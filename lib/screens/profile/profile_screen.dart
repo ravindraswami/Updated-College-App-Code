@@ -4,6 +4,7 @@ import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/constants.dart';
+import '../../utils/academic_data.dart';
 import '../legal/legal_screen.dart';
 import '../../widgets/location_picker.dart';
 
@@ -252,8 +253,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _Card(
                     title: 'Academic Information',
                     children: [
-                      _row('Branch', widget.user.branch),
-                      _row('Year', widget.user.year),
+                      _row('Branch', AcademicData.branchFullLabel(widget.user.branch)),
+                      _row('Year', AcademicData.yearFullLabel(widget.user.year)),
                       _row('Semester', widget.user.semester),
                       _row(
                         'Registration No.',

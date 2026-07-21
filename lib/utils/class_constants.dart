@@ -1,70 +1,81 @@
 /// Class system — based on Branch + Semester (matches student registration)
 /// classId format: "BIO-TECH-UG|SEM-I"  (branch|semester)
-/// This replaces the old FY-A / SY-B system
 class ClassConstants {
   // All possible branch+semester combinations
   static const Map<String, ClassInfo> classes = {
-    // BIO-TECH (UG) — 6 semesters
+    // B.Tech (Biotechnology) — 8 semesters (FY→SY→TY→LY)
     'BIO-TECH-UG|SEM-I': ClassInfo(
       'BIO-TECH-UG|SEM-I',
-      'BIO-TECH (UG)',
+      'B.Tech (Biotechnology)',
       'Sem I',
-      'BIO-TECH UG — Semester I',
+      'B.Tech (Biotechnology) — Semester I',
     ),
     'BIO-TECH-UG|SEM-II': ClassInfo(
       'BIO-TECH-UG|SEM-II',
-      'BIO-TECH (UG)',
+      'B.Tech (Biotechnology)',
       'Sem II',
-      'BIO-TECH UG — Semester II',
+      'B.Tech (Biotechnology) — Semester II',
     ),
     'BIO-TECH-UG|SEM-III': ClassInfo(
       'BIO-TECH-UG|SEM-III',
-      'BIO-TECH (UG)',
+      'B.Tech (Biotechnology)',
       'Sem III',
-      'BIO-TECH UG — Semester III',
+      'B.Tech (Biotechnology) — Semester III',
     ),
     'BIO-TECH-UG|SEM-IV': ClassInfo(
       'BIO-TECH-UG|SEM-IV',
-      'BIO-TECH (UG)',
+      'B.Tech (Biotechnology)',
       'Sem IV',
-      'BIO-TECH UG — Semester IV',
+      'B.Tech (Biotechnology) — Semester IV',
     ),
     'BIO-TECH-UG|SEM-V': ClassInfo(
       'BIO-TECH-UG|SEM-V',
-      'BIO-TECH (UG)',
+      'B.Tech (Biotechnology)',
       'Sem V',
-      'BIO-TECH UG — Semester V',
+      'B.Tech (Biotechnology) — Semester V',
     ),
     'BIO-TECH-UG|SEM-VI': ClassInfo(
       'BIO-TECH-UG|SEM-VI',
-      'BIO-TECH (UG)',
+      'B.Tech (Biotechnology)',
       'Sem VI',
-      'BIO-TECH UG — Semester VI',
+      'B.Tech (Biotechnology) — Semester VI',
     ),
-    // BIO-TECH (PG) — 4 semesters
+    'BIO-TECH-UG|SEM-VII': ClassInfo(
+      'BIO-TECH-UG|SEM-VII',
+      'B.Tech (Biotechnology)',
+      'Sem VII',
+      'B.Tech (Biotechnology) — Semester VII',
+    ),
+    'BIO-TECH-UG|SEM-VIII': ClassInfo(
+      'BIO-TECH-UG|SEM-VIII',
+      'B.Tech (Biotechnology)',
+      'Sem VIII',
+      'B.Tech (Biotechnology) — Semester VIII',
+    ),
+    // M.Sc (Molecular Biology & Biotechnology) — 4 semesters
     'BIO-TECH-PG|SEM-I': ClassInfo(
       'BIO-TECH-PG|SEM-I',
-      'BIO-TECH (PG)',
+      'M.Sc (Molecular Biology & Biotechnology)',
       'Sem I',
-      'BIO-TECH PG — Semester I',
+      'M.Sc (Molecular Biology & Biotechnology) — Semester I',
     ),
     'BIO-TECH-PG|SEM-II': ClassInfo(
       'BIO-TECH-PG|SEM-II',
-      'BIO-TECH (PG)',
+      'M.Sc (Molecular Biology & Biotechnology)',
       'Sem II',
-      'BIO-TECH PG — Semester II',
+      'M.Sc (Molecular Biology & Biotechnology) — Semester II',
     ),
     'BIO-TECH-PG|SEM-III': ClassInfo(
       'BIO-TECH-PG|SEM-III',
-      'BIO-TECH (PG)',
+      'M.Sc (Molecular Biology & Biotechnology)',
       'Sem III',
-      'BIO-TECH PG — Semester III',
+      'M.Sc (Molecular Biology & Biotechnology) — Semester III',
     ),
     'BIO-TECH-PG|SEM-IV': ClassInfo(
       'BIO-TECH-PG|SEM-IV',
-      'BIO-TECH (PG)',
+      'M.Sc (Molecular Biology & Biotechnology)',
       'Sem IV',
-      'BIO-TECH PG — Semester IV',
+      'M.Sc (Molecular Biology & Biotechnology) — Semester IV',
     ),
   };
 
@@ -103,15 +114,79 @@ class ClassConstants {
     }
     return result;
   }
+
+  /// Unique branch ids (e.g. 'BIO-TECH-UG', 'BIO-TECH-PG')
+  static List<String> get allBranchIds {
+    final seen = <String>{};
+    return allClassIds.map((id) => branchFrom(id)).where(seen.add).toList();
+  }
+
+  /// Human-readable label for a branch id
+  static String branchLabel(String branchId) {
+    final entry = classes.entries.firstWhere(
+      (e) => e.value.id.startsWith(branchId),
+      orElse: () => MapEntry('', ClassInfo('', branchId, '', branchId)),
+    );
+    return entry.value.branchLabel;
+  }
+
+  /// Year ids available for a given branch
+  /// Returns distinct year portions derived from the classId semesters,
+  /// using AcademicData ordering (FY→SY→TY→LY).
+  static List<YearEntry> yearsForBranch(String branchId) {
+    // Build from classes map — group sems under year labels
+    // We infer year from semester number:
+    // SEM-I,II → FY; SEM-III,IV → SY; SEM-V,VI → TY; SEM-VII,VIII → LY
+    const semToYear = {
+      'SEM-I': YearEntry('FY', 'First Year (FY)'),
+      'SEM-II': YearEntry('FY', 'First Year (FY)'),
+      'SEM-III': YearEntry('SY', 'Second Year (SY)'),
+      'SEM-IV': YearEntry('SY', 'Second Year (SY)'),
+      'SEM-V': YearEntry('TY', 'Third Year (TY)'),
+      'SEM-VI': YearEntry('TY', 'Third Year (TY)'),
+      'SEM-VII': YearEntry('LY', 'Fourth Year (LY)'),
+      'SEM-VIII': YearEntry('LY', 'Fourth Year (LY)'),
+    };
+    final seen = <String>{};
+    final result = <YearEntry>[];
+    for (final classId in allClassIds) {
+      if (!classId.startsWith('$branchId|')) continue;
+      final sem = semesterFrom(classId);
+      final ye = semToYear[sem];
+      if (ye != null && seen.add(ye.id)) result.add(ye);
+    }
+    return result;
+  }
+
+  /// Semester classIds for a given branch + year
+  static List<String> semsForBranchYear(String branchId, String yearId) {
+    const yearToSems = {
+      'FY': ['SEM-I', 'SEM-II'],
+      'SY': ['SEM-III', 'SEM-IV'],
+      'TY': ['SEM-V', 'SEM-VI'],
+      'LY': ['SEM-VII', 'SEM-VIII'],
+    };
+    final sems = yearToSems[yearId] ?? [];
+    return sems
+        .map((s) => '$branchId|$s')
+        .where((id) => classes.containsKey(id))
+        .toList();
+  }
 }
 
 class ClassInfo {
   final String id;
-  final String branchLabel; // 'BIO-TECH (UG)'
-  final String semLabel; // 'Sem I'
-  final String fullLabel; // 'BIO-TECH UG — Semester I'
+  final String branchLabel;
+  final String semLabel;
+  final String fullLabel;
 
   const ClassInfo(this.id, this.branchLabel, this.semLabel, this.fullLabel);
 
   String get shortLabel => '$branchLabel · $semLabel';
+}
+
+class YearEntry {
+  final String id;
+  final String label;
+  const YearEntry(this.id, this.label);
 }

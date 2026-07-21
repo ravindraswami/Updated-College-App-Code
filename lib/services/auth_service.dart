@@ -39,8 +39,10 @@ class AuthService {
     String abcId = '',
     String aadharNo = '',
     String dob = '',
+    String admissionDate = '',
     String mobile = '',
     String maritalStatus = '',
+    String gender = '',
     String address = '',
     String state = '',
     String district = '',
@@ -86,17 +88,51 @@ class AuthService {
         builtClassId = '$branch|$semester';
       }
 
-      // Find coordinator assigned to this class
+      // Fix 6: Auto-assign CC based on student ID serial number range
+      // Student ID format: 2025BTLT001, 2025BTLT025, etc.
+      // Range 001-025 → CC1 (lowest classNumber among CCs for same classId)
+      // Range 026-050 → CC2, 051-075 → CC3, etc.
       String coordinatorId = '';
       if (role == 'student' && builtClassId.isNotEmpty) {
+        // Extract the trailing serial number from registerNo
+        int? studentSerial;
+        if (registerNo.isNotEmpty) {
+          final match = RegExp(r'(\d+)$').firstMatch(registerNo);
+          if (match != null) {
+            studentSerial = int.tryParse(match.group(1)!);
+          }
+        }
+
+        // Use Incharge-assigned slotStart/slotEnd per coordinator for matching
         final coordSnap = await _firestore
             .collection('users')
             .where('role', isEqualTo: 'coordinator')
             .where('classId', isEqualTo: builtClassId)
-            .limit(1)
             .get();
+
         if (coordSnap.docs.isNotEmpty) {
-          coordinatorId = coordSnap.docs.first.id;
+          if (studentSerial != null) {
+            // Match by Incharge-assigned slotStart/slotEnd range
+            String? matchedId;
+            String? fallbackId;
+            for (final doc in coordSnap.docs) {
+              final data = doc.data();
+              final slotStart = data['slotStart'] as int?;
+              final slotEnd = data['slotEnd'] as int?;
+              fallbackId ??= doc.id;
+              if (slotStart != null &&
+                  slotEnd != null &&
+                  studentSerial >= slotStart &&
+                  studentSerial <= slotEnd) {
+                matchedId = doc.id;
+                break;
+              }
+            }
+            coordinatorId = matchedId ?? fallbackId ?? '';
+          } else {
+            // No serial → assign first coordinator for the class
+            coordinatorId = coordSnap.docs.first.id;
+          }
         }
       }
 
@@ -125,8 +161,10 @@ class AuthService {
         abcId: abcId,
         aadharNo: aadharNo,
         dob: dob,
+        admissionDate: admissionDate,
         mobile: mobile,
         maritalStatus: maritalStatus,
+        gender: gender,
         address: address,
         state: state,
         district: district,

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import '../../models/user_model.dart';
 import '../../models/exam_form_model.dart';
 import '../../models/subject_model.dart';
 import '../../services/exam_form_service.dart';
 import '../../services/subject_service.dart';
+import '../../services/class_advisor_assignment_service.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/academic_data.dart';
 import '../../widgets/common_widgets.dart';
@@ -65,7 +69,7 @@ class ExamFormApplyScreen extends StatelessWidget {
                     ),
                     _StepRow(
                       step: '2',
-                      text: 'Class Coordinator reviews and approves',
+                      text: 'Advisor reviews and approves',
                     ),
                     _StepRow(
                       step: '3',
@@ -152,9 +156,10 @@ class _ExamFormFillScreen extends StatefulWidget {
 
 class _ExamFormFillScreenState extends State<_ExamFormFillScreen> {
   final _svc = ExamFormService();
+  final _advisorSvc = ClassAdvisorAssignmentService();
+  String? _session;
   final _subSvc = SubjectService();
 
-  final _centerCtrl = TextEditingController();
   bool _hasBacklog = false;
 
   // Current sem subjects — auto-loaded from Firestore
@@ -168,10 +173,6 @@ class _ExamFormFillScreenState extends State<_ExamFormFillScreen> {
   final Set<String> _selectedBacklogIds = {};
   bool _loadingBacklog = false;
 
-  String? _examYear;
-  String? _examMonth;
-
-  final _years = ['2024', '2025', '2026', '2027'];
   final _months = [
     'January',
     'February',
@@ -249,22 +250,67 @@ class _ExamFormFillScreenState extends State<_ExamFormFillScreen> {
       _snack('Please select at least one subject.', isError: true);
       return;
     }
-    if (_examYear == null || _examMonth == null) {
-      _snack('Please select exam year and month.', isError: true);
+    if (_session == null) {
+      _snack('Please select exam session (Summer / Winter).', isError: true);
       return;
     }
 
     setState(() => _loading = true);
     final s = widget.student;
     try {
-      final selSubjects = _currentSubjects
+      final selSubjectModels = _currentSubjects
           .where((sub) => _selectedSubjectIds.contains(sub.id))
-          .map((sub) => sub.displayName)
           .toList();
-      final selBacklog = _backlogSubjectList
+      final selSubjects = selSubjectModels.map((sub) => sub.displayName).toList();
+      final selSubjectIds = selSubjectModels.map((sub) => sub.id).toList();
+
+      // Build per-subject fee / credit / code / title maps
+      final Map<String, double> regularFees = {};
+      final Map<String, double> regularCredits = {};
+      final Map<String, String> regularCodes = {};
+      final Map<String, String> regularTitles = {};
+      for (final sub in selSubjectModels) {
+        regularFees[sub.id] = sub.regularFee;
+        regularCredits[sub.id] = sub.totalCredit;
+        regularCodes[sub.id] = sub.code;
+        regularTitles[sub.id] = sub.name;
+      }
+
+      final selBacklogModels = _backlogSubjectList
           .where((sub) => _selectedBacklogIds.contains(sub.id))
+          .toList();
+      final selBacklog = selBacklogModels
           .map((sub) => '${_backlogSem ?? ''} — ${sub.displayName}')
           .toList();
+      final selBacklogIds = selBacklogModels.map((sub) => sub.id).toList();
+
+      final Map<String, double> backlogFees = {};
+      final Map<String, double> backlogCredits = {};
+      final Map<String, String> backlogCodes = {};
+      final Map<String, String> backlogTitles = {};
+      for (final sub in selBacklogModels) {
+        backlogFees[sub.id] = sub.backlogFee;
+        backlogCredits[sub.id] = sub.totalCredit;
+        backlogCodes[sub.id] = sub.code;
+        backlogTitles[sub.id] = sub.name;
+      }
+
+      // Auto-fetch Class Advisor assigned to this student's reg-no range
+      String advisorName = '';
+      String advisorDesignation = '';
+      try {
+        final advisor = await _advisorSvc.findAdvisorFor(
+          s.branch,
+          s.year,
+          s.registerNo,
+        );
+        if (advisor != null) {
+          advisorName = advisor.advisorName;
+          advisorDesignation = 'Advisor';
+        }
+      } catch (_) {
+        // Non-fatal: advisor lookup failure shouldn't block submission
+      }
 
       await _svc.submitForm(
         ExamFormModel(
@@ -277,17 +323,30 @@ class _ExamFormFillScreenState extends State<_ExamFormFillScreen> {
           branch: s.branch,
           year: s.year,
           semester: s.semester,
-          department: '',
+          department: AcademicData.branchFullLabel(s.branch),
           rollNo: s.registerNo,
           dob: s.dob,
           mobile: s.mobile,
           email: s.email,
           subjects: selSubjects,
+          subjectIds: selSubjectIds,
           hasBacklog: _hasBacklog && selBacklog.isNotEmpty,
           backlogSubjects: selBacklog,
-          examYear: _examYear!,
-          examMonth: _examMonth!,
-          center: _centerCtrl.text.trim(),
+          backlogSubjectIds: selBacklogIds,
+          subjectRegularFees: regularFees,
+          subjectBacklogFees: backlogFees,
+          subjectCredits: regularCredits,
+          backlogSubjectCredits: backlogCredits,
+          subjectCodes: regularCodes,
+          subjectTitles: regularTitles,
+          backlogSubjectCodes: backlogCodes,
+          backlogSubjectTitles: backlogTitles,
+          session: _session!,
+          advisorName: advisorName,
+          advisorDesignation: advisorDesignation,
+          examYear: DateTime.now().year.toString(),
+          examMonth: _months[DateTime.now().month - 1],
+          center: '',
           submittedAt: DateTime.now(),
         ),
       );
@@ -359,6 +418,25 @@ class _ExamFormFillScreenState extends State<_ExamFormFillScreen> {
             ),
             const SizedBox(height: 20),
 
+            // ── Session ──────────────────────────────────────
+            const _SectionHeader(title: 'Exam Session'),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _session,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Session *',
+                prefixIcon: Icon(Icons.wb_sunny_outlined),
+                isDense: true,
+              ),
+              hint: const Text('Select Summer / Winter'),
+              items: const ['Summer', 'Winter']
+                  .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                  .toList(),
+              onChanged: (v) => setState(() => _session = v),
+            ),
+            const SizedBox(height: 20),
+
             // ── Current Semester Subjects ──────────────────────
             const _SectionHeader(
               title: 'Subjects Appearing For (Current Semester)',
@@ -418,6 +496,16 @@ class _ExamFormFillScreenState extends State<_ExamFormFillScreen> {
                     sub.displayName,
                     style: const TextStyle(fontSize: 13),
                   ),
+                  subtitle: sub.regularFee > 0
+                      ? Text(
+                          'Regular Fee: ₹${sub.regularFee.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.teal,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        )
+                      : null,
                   secondary: sub.code.isNotEmpty
                       ? Container(
                           padding: const EdgeInsets.symmetric(
@@ -545,6 +633,16 @@ class _ExamFormFillScreenState extends State<_ExamFormFillScreen> {
                                   sub.displayName,
                                   style: const TextStyle(fontSize: 13),
                                 ),
+                                subtitle: sub.backlogFee > 0
+                                    ? Text(
+                                        'Backlog Fee: ₹${sub.backlogFee.toStringAsFixed(0)}',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.orange,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      )
+                                    : null,
                               ),
                             ),
                           ],
@@ -555,55 +653,6 @@ class _ExamFormFillScreenState extends State<_ExamFormFillScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // ── Exam Year + Month ──────────────────────────────
-            const _SectionHeader(title: 'Exam Details'),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _examYear,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Exam Year *',
-                      isDense: true,
-                    ),
-                    hint: const Text('Year'),
-                    items: _years
-                        .map((y) => DropdownMenuItem(value: y, child: Text(y)))
-                        .toList(),
-                    onChanged: (v) => setState(() => _examYear = v),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _examMonth,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Exam Month *',
-                      isDense: true,
-                    ),
-                    hint: const Text('Month'),
-                    items: _months
-                        .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                        .toList(),
-                    onChanged: (v) => setState(() => _examMonth = v),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _centerCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Exam Center (Optional)',
-                prefixIcon: Icon(Icons.location_on_outlined),
-                hintText: 'e.g. Solapur',
-              ),
-            ),
-            const SizedBox(height: 24),
 
             SizedBox(
               width: double.infinity,
@@ -635,10 +684,306 @@ class _ExamFormFillScreenState extends State<_ExamFormFillScreen> {
 }
 
 // ── Form status card ──────────────────────────────────────────
-class _FormStatusCard extends StatelessWidget {
+class _FormStatusCard extends StatefulWidget {
   final ExamFormModel form;
   final ExamFormService svc;
   const _FormStatusCard({required this.form, required this.svc});
+  @override
+  State<_FormStatusCard> createState() => _FormStatusCardState();
+}
+
+class _FormStatusCardState extends State<_FormStatusCard> {
+  ExamFormModel get form => widget.form;
+  ExamFormService get svc => widget.svc;
+  bool _printing = false;
+
+  Future<void> _printForm() async {
+    setState(() => _printing = true);
+    try {
+      final doc = pw.Document();
+
+      // ── Build regular subject rows: Sr, Code, Title, Credit ──
+      final regularRows = <List<String>>[];
+      var sr = 1;
+      for (final id in form.subjectIds) {
+        final code = form.subjectCodes[id] ?? '';
+        final title = form.subjectTitles[id] ?? '';
+        final credit = (form.subjectCredits[id] ?? 0).toStringAsFixed(1);
+        regularRows.add(['${sr++}', code, title, credit]);
+      }
+
+      final backlogRows = <List<String>>[];
+      var srB = 1;
+      for (final id in form.backlogSubjectIds) {
+        final code = form.backlogSubjectCodes[id] ?? '';
+        final title = form.backlogSubjectTitles[id] ?? '';
+        final credit =
+            (form.backlogSubjectCredits[id] ?? 0).toStringAsFixed(1);
+        backlogRows.add(['${srB++}', code, title, credit]);
+      }
+
+      pw.Widget courseTable(String heading, List<List<String>> rows,
+          int totalCourses, double totalCredit) {
+        return pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.SizedBox(height: 14),
+            pw.Text(
+              heading,
+              style: pw.TextStyle(
+                  fontSize: 11, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 6),
+            pw.Table(
+              border:
+                  pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+              columnWidths: {
+                0: const pw.FixedColumnWidth(30),
+                1: const pw.FixedColumnWidth(70),
+                2: const pw.FlexColumnWidth(),
+                3: const pw.FixedColumnWidth(60),
+              },
+              children: [
+                pw.TableRow(
+                  decoration:
+                      const pw.BoxDecoration(color: PdfColors.grey200),
+                  children: ['Sr', 'Course Code', 'Course Title', 'Credit']
+                      .map(
+                        (h) => pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 4),
+                          child: pw.Text(
+                            h,
+                            style: pw.TextStyle(
+                                fontSize: 9, fontWeight: pw.FontWeight.bold),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+                ...rows.map(
+                  (r) => pw.TableRow(
+                    children: r
+                        .map(
+                          (v) => pw.Padding(
+                            padding: const pw.EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 4),
+                            child: pw.Text(v,
+                                style: const pw.TextStyle(fontSize: 9)),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+                pw.TableRow(
+                  decoration:
+                      const pw.BoxDecoration(color: PdfColors.grey100),
+                  children: [
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 4),
+                      child: pw.Text(''),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 4),
+                      child: pw.Text(''),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 4),
+                      child: pw.Text(
+                        'Total Courses: $totalCourses',
+                        style: pw.TextStyle(
+                            fontSize: 9, fontWeight: pw.FontWeight.bold),
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 4),
+                      child: pw.Text(
+                        totalCredit.toStringAsFixed(1),
+                        style: pw.TextStyle(
+                            fontSize: 9, fontWeight: pw.FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+      }
+
+      doc.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(36),
+          build: (ctx) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.Text(
+                'EXAMINATION FORM — APPROVED',
+                style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Container(width: 80, height: 2, color: PdfColors.green800),
+              pw.SizedBox(height: 16),
+              pw.Table(
+                border: pw.TableBorder.all(
+                  color: PdfColors.grey400,
+                  width: 0.5,
+                ),
+                columnWidths: {
+                  0: const pw.FixedColumnWidth(160),
+                  1: const pw.FlexColumnWidth(),
+                },
+                children:
+                    [
+                      ['Form ID', form.id.substring(0, 8).toUpperCase()],
+                      ['Session', form.session],
+                      ['Student Name', form.name],
+                      ['Register No.', form.rollNo],
+                      ['Semester', form.semester],
+                      ['Department', form.department],
+                      ['Advisor Name', form.advisorName],
+                      ['Designation', form.advisorDesignation],
+                      ['Status', 'APPROVED ✓'],
+                      ['Fee Paid', '₹${form.feeAmount.toStringAsFixed(0)}'],
+                    ].map((row) {
+                      return pw.TableRow(
+                        children: [
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 5,
+                            ),
+                            child: pw.Text(
+                              row[0],
+                              style: pw.TextStyle(
+                                fontWeight: pw.FontWeight.bold,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 5,
+                            ),
+                            child: pw.Text(
+                              row[1],
+                              style: const pw.TextStyle(fontSize: 10),
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+              ),
+
+              if (regularRows.isNotEmpty)
+                courseTable('Regular Subjects', regularRows,
+                    form.totalCourseCount, form.totalCreditSum),
+
+              if (backlogRows.isNotEmpty)
+                courseTable('Backlog Subjects', backlogRows,
+                    form.totalBacklogCourseCount, form.totalBacklogCreditSum),
+
+              pw.SizedBox(height: 16),
+              pw.Align(
+                alignment: pw.Alignment.centerLeft,
+                child: pw.Text(
+                  'Suggestion Codes:  RR = Result Reserved   •   NR = Not Registered   •   OEF = Online Exam Form',
+                  style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+                ),
+              ),
+
+              pw.SizedBox(height: 40),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    children: [
+                      pw.Container(
+                        width: 100,
+                        height: 1,
+                        color: PdfColors.black,
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        'Student Signature',
+                        style: const pw.TextStyle(
+                          fontSize: 9,
+                          color: PdfColors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                  pw.Column(
+                    children: [
+                      pw.Container(
+                        width: 130,
+                        height: 1,
+                        color: PdfColors.black,
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        'Advisor Signature (${form.advisorName})',
+                        style: const pw.TextStyle(
+                          fontSize: 9,
+                          color: PdfColors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                  pw.Column(
+                    children: [
+                      pw.Container(
+                        width: 130,
+                        height: 1,
+                        color: PdfColors.black,
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        'Principal / Controller of Examinations',
+                        style: const pw.TextStyle(
+                          fontSize: 9,
+                          color: PdfColors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 20),
+              pw.Divider(color: PdfColors.grey300),
+              pw.Text(
+                'Generated via Smart ERP • ${DateFormat('dd MMM yyyy').format(DateTime.now())}',
+                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey),
+              ),
+            ],
+          ),
+        ),
+      );
+      final bytes = await doc.save();
+      await Printing.layoutPdf(onLayout: (_) async => bytes);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => _buildCard(context);
 
   Color get _color {
     switch (form.status) {
@@ -674,8 +1019,7 @@ class _FormStatusCard extends StatelessWidget {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildCard(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(
@@ -716,10 +1060,6 @@ class _FormStatusCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            Text(
-              'Exam: ${form.examMonth} ${form.examYear}',
-              style: const TextStyle(color: Colors.grey, fontSize: 12),
-            ),
             Text(
               'Subjects: ${form.subjects.join(", ")}',
               style: const TextStyle(color: Colors.grey, fontSize: 12),
@@ -779,6 +1119,34 @@ class _FormStatusCard extends StatelessWidget {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.success,
+                  ),
+                ),
+              ),
+            ],
+
+            // Print button for approved forms
+            if (form.status == 'approved') ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: _printing
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.print, size: 16),
+                  label: Text(
+                    _printing ? 'Preparing PDF...' : 'Print / Download Form',
+                  ),
+                  onPressed: _printing ? null : _printForm,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.success,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
                   ),
                 ),
               ),

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../services/user_service.dart';
+import '../../services/scholarship_service.dart';
 import '../../models/user_model.dart';
+import '../../models/scholarship_model.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/class_constants.dart';
 import '../../widgets/common_widgets.dart';
@@ -27,7 +29,7 @@ class _CoordinatorDashboardState extends State<CoordinatorDashboard> {
 
   // Drawer index:
   // 0 = Home, 1 = My Class Students, 2 = Pending Requests,
-  // 3 = Notes, 4 = Exam Forms
+  // 3 = Notes, 4 = Exam Forms, 5 = Scholarship Forms
   int _drawerIndex = 0;
 
   static const _ccColor = Color(0xFF0891B2);
@@ -38,6 +40,7 @@ class _CoordinatorDashboardState extends State<CoordinatorDashboard> {
     'Pending Requests',
     'Study Materials',
     'Exam Forms',
+    'Scholarship Forms',
   ];
 
   @override
@@ -96,6 +99,10 @@ class _CoordinatorDashboardState extends State<CoordinatorDashboard> {
         return _user == null
             ? const LoadingWidget()
             : ExamFormCcTab(coordinator: _user!);
+      case 5:
+        return _user == null
+            ? const LoadingWidget()
+            : _ScholarshipCcTab(coordinator: _user!);
       default:
         return _HomeTab(user: _user, svc: _svc);
     }
@@ -218,6 +225,11 @@ class _CCDrawer extends StatelessWidget {
       icon: Icons.edit_document,
       selectedIcon: Icons.edit_document,
     ),
+    _DrawerEntry(
+      label: 'Scholarship Forms',
+      icon: Icons.school_outlined,
+      selectedIcon: Icons.school,
+    ),
   ];
 
   @override
@@ -263,7 +275,7 @@ class _CCDrawer extends StatelessWidget {
                     ),
                   ),
                   const Text(
-                    'Class Coordinator',
+                    'Advisor',
                     style: TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                   if (user?.classId.isNotEmpty == true)
@@ -378,7 +390,7 @@ class _HomeTab extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Class Coordinator',
+                  'Advisor',
                   style: TextStyle(color: Colors.white70, fontSize: 13),
                 ),
                 Text(
@@ -466,7 +478,7 @@ class _HomeTab extends StatelessWidget {
                             ),
                             SizedBox(width: 8),
                             Text(
-                              'No class assigned yet. Contact your HOD.',
+                              'No class assigned yet. Contact your Incharge.',
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 12,
@@ -494,7 +506,7 @@ class _HomeTab extends StatelessWidget {
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'You have not been assigned a class yet. Contact your HOD to get a class and student slot assigned.',
+                      'You have not been assigned a class yet. Contact your Incharge to get a class and student slot assigned.',
                       style: TextStyle(color: AppTheme.warning),
                     ),
                   ),
@@ -551,7 +563,7 @@ class _MyStudentsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     if (coordId.isEmpty)
       return const EmptyWidget(
-        message: 'No class assigned.\nContact your HOD.',
+        message: 'No class assigned.\nContact your Incharge.',
         icon: Icons.class_outlined,
       );
 
@@ -606,7 +618,7 @@ class _PendingTab extends StatelessWidget {
   Widget build(BuildContext context) {
     if (coordId.isEmpty)
       return const EmptyWidget(
-        message: 'No class assigned.\nContact your HOD.',
+        message: 'No class assigned.\nContact your Incharge.',
         icon: Icons.pending_outlined,
       );
 
@@ -846,4 +858,261 @@ class _StudentTile extends StatelessWidget {
       ),
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+// SCHOLARSHIP CC TAB
+// ─────────────────────────────────────────────────────────────
+class _ScholarshipCcTab extends StatelessWidget {
+  final UserModel coordinator;
+  const _ScholarshipCcTab({required this.coordinator});
+
+  @override
+  Widget build(BuildContext context) {
+    final svc = ScholarshipService();
+
+    if (coordinator.classId.isEmpty) {
+      return const EmptyWidget(
+        message: 'No class assigned to you yet.\nAsk your Incharge to assign a class first.',
+        icon: Icons.class_outlined,
+      );
+    }
+
+    return StreamBuilder<List<ScholarshipModel>>(
+      stream: svc.getPendingForClass(coordinator.classId),
+      builder: (ctx, snap) {
+        if (snap.hasError) {
+          return Center(child: Text('Error: ${snap.error}'));
+        }
+        if (!snap.hasData) return const LoadingWidget();
+
+        final forms = snap.data!;
+        if (forms.isEmpty) {
+          return EmptyWidget(
+            message: 'No scholarship applications pending for class:\n${coordinator.classId}\n\nStudents will appear here after they apply.',
+            icon: Icons.school_outlined,
+          );
+        }
+
+        return Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: const Color(0xFF0F766E).withOpacity(0.06),
+              child: Row(
+                children: [
+                  const Icon(Icons.school, color: Color(0xFF0F766E), size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${forms.length} scholarship application(s) pending — ${coordinator.classId}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(12),
+                itemCount: forms.length,
+                itemBuilder: (_, i) => _ScholarshipCcCard(
+                  app: forms[i],
+                  svc: svc,
+                  coordinator: coordinator,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ScholarshipCcCard extends StatelessWidget {
+  final ScholarshipModel app;
+  final ScholarshipService svc;
+  final UserModel coordinator;
+  const _ScholarshipCcCard({required this.app, required this.svc, required this.coordinator});
+
+  Future<void> _approve(BuildContext context) async {
+    final remarksCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Approve Scholarship Application'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Approving for ${app.studentName}.',
+                style: const TextStyle(color: Colors.grey, fontSize: 13)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: remarksCtrl,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Remarks (Optional)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Approve'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    await svc.ccApprove(
+      app.id,
+      coordinator.name.isNotEmpty ? coordinator.name : coordinator.erpId,
+      remarks: remarksCtrl.text.trim(),
+    );
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('${app.studentName}\'s scholarship application approved → Technical Staff.'),
+        backgroundColor: AppTheme.success,
+      ));
+    }
+  }
+
+  Future<void> _reject(BuildContext context) async {
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Reject Scholarship Application'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Rejecting for ${app.studentName}.',
+                style: const TextStyle(color: Colors.grey, fontSize: 13)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Reason for Rejection *',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Reject'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    await svc.ccReject(
+      app.id,
+      coordinator.name.isNotEmpty ? coordinator.name : coordinator.erpId,
+      remarks: ctrl.text.trim().isNotEmpty ? ctrl.text.trim() : 'Rejected by Coordinator',
+    );
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Application rejected.'),
+        backgroundColor: AppTheme.error,
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: const Color(0xFF0F766E).withOpacity(0.1),
+                  child: Text(
+                    app.studentName.isNotEmpty ? app.studentName[0].toUpperCase() : 'S',
+                    style: const TextStyle(color: Color(0xFF0F766E), fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(app.studentName,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          overflow: TextOverflow.ellipsis),
+                      Text('ERP: ${app.erpId}',
+                          style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                      Text('${app.branch} ${app.year} — ${app.semester}',
+                          style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            _row(Icons.card_giftcard_outlined, 'Scholarship', app.scholarshipType),
+            _row(Icons.category_outlined, 'Caste Category', app.casteCategory),
+            if (app.mobile.isNotEmpty) _row(Icons.phone_outlined, 'Mobile', app.mobile),
+            if (app.pdfFileName.isNotEmpty)
+              _row(Icons.attach_file, 'Uploaded Form', app.pdfFileName),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _reject(context),
+                    icon: const Icon(Icons.close, size: 16),
+                    label: const Text('Reject'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.error,
+                      side: const BorderSide(color: AppTheme.error),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _approve(context),
+                    icon: const Icon(Icons.check, size: 16),
+                    label: const Text('Approve → Technical'),
+                    style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _row(IconData icon, String label, String value) => Padding(
+    padding: const EdgeInsets.only(bottom: 5),
+    child: Row(
+      children: [
+        Icon(icon, size: 14, color: Colors.grey),
+        const SizedBox(width: 6),
+        Text('$label: ', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+        Expanded(
+          child: Text(value,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+              overflow: TextOverflow.ellipsis),
+        ),
+      ],
+    ),
+  );
 }

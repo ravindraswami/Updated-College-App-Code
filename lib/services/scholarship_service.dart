@@ -53,6 +53,7 @@ class ScholarshipService {
       'motherName': student.motherName,
       'aadharNo': student.aadharNo,
       'dob': student.dob,
+      'gender': student.gender,
       // Student-entered
       'scholarshipType': scholarshipType,
       'formFilledStatus': formFilledStatus,
@@ -153,6 +154,20 @@ class ScholarshipService {
       });
 
   /// All scholarship requests — for recent activity feeds (newest first)
+  Stream<List<ScholarshipModel>> getApprovedScholarships() {
+    return _db
+        .collection('scholarship_requests')
+        .where('status', isEqualTo: 'approved')
+        .snapshots()
+        .map((s) {
+          final list = s.docs
+              .map((d) => ScholarshipModel.fromMap(d.data(), d.id))
+              .toList();
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
+        });
+  }
+
   Stream<List<ScholarshipModel>> getAllScholarships() {
     return _db
         .collection('scholarship_requests')
@@ -162,4 +177,19 @@ class ScholarshipService {
             .map((d) => ScholarshipModel.fromMap(d.data(), d.id))
             .toList());
   }
+  Future<void> markPaymentDone(
+    String id,
+    String transactionId, {
+    String paymentDate = '',
+    String screenshotUrl = '',
+  }) async {
+    await _db.collection('scholarship_applications').doc(id).update({
+      'isPaid': true,
+      'paymentId': transactionId,
+      'paymentDate': paymentDate,
+      'paymentScreenshotUrl': screenshotUrl,
+      'status': 'pending_cc',
+    });
+  }
+
 }

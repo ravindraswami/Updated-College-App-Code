@@ -8,7 +8,10 @@ import 'package:smart_exam/screens/student/my_results_screen.dart';
 import 'package:smart_exam/screens/student/scholarship_apply_screen.dart';
 import 'package:smart_exam/screens/student/tc_screen.dart';
 import '../../services/auth_service.dart';
+import '../../services/class_advisor_assignment_service.dart';
+import '../../services/user_service.dart';
 import '../../models/user_model.dart';
+import '../../models/class_advisor_assignment_model.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/app_drawer.dart';
 import '../auth/login_screen.dart';
@@ -137,7 +140,11 @@ class _StudentDashboardState extends State<StudentDashboard> {
     }
     switch (_drawerIndex) {
       case 0:
-        return ExamListScreen(studentId: _user!.id);
+        return ExamListScreen(
+          studentId: _user!.id,
+          branch: _user!.branch,
+          semester: _user!.semester,
+        );
       case 1:
         return MyResultsScreen(studentId: _user!.id);
       case 2:
@@ -366,6 +373,10 @@ class _StudentHome extends StatelessWidget {
             ),
           ],
 
+          // ── My Advisor card ────────────────────────────────
+          _MyAdvisorCard(user: user),
+          const SizedBox(height: 20),
+
           // ── Section cards ─────────────────────────────────
           const Text(
             'Quick Access',
@@ -519,6 +530,161 @@ class _StudentHome extends StatelessWidget {
 }
 
 // ── Section card widget ───────────────────────────────────────
+/// Shows the student's assigned Class Advisor: name, batch range, mobile.
+class _MyAdvisorCard extends StatefulWidget {
+  final UserModel user;
+  const _MyAdvisorCard({required this.user});
+
+  @override
+  State<_MyAdvisorCard> createState() => _MyAdvisorCardState();
+}
+
+class _MyAdvisorCardState extends State<_MyAdvisorCard> {
+  final _assignmentService = ClassAdvisorAssignmentService();
+  final _userService = UserService();
+  bool _loading = true;
+  ClassAdvisorAssignmentModel? _assignment;
+  String _advisorMobile = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final u = widget.user;
+    final regNo = u.registerNo.isNotEmpty ? u.registerNo : u.erpId;
+    if (u.branch.isEmpty || u.year.isEmpty || regNo.isEmpty) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
+    try {
+      final assignment = await _assignmentService.findAdvisorFor(
+        u.branch,
+        u.year,
+        regNo,
+      );
+      String mobile = '';
+      if (assignment != null && assignment.advisorId.isNotEmpty) {
+        final advisorUser = await _userService.getUser(assignment.advisorId);
+        mobile = advisorUser?.mobile ?? '';
+      }
+      if (mounted) {
+        setState(() {
+          _assignment = assignment;
+          _advisorMobile = mobile;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const SizedBox.shrink();
+    }
+    if (_assignment == null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppTheme.warning.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.warning.withOpacity(0.3)),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.info_outline, color: AppTheme.warning, size: 20),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'No class advisor assigned to your batch yet.',
+                style: TextStyle(fontSize: 12.5, color: AppTheme.warning),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final a = _assignment!;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF059669).withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF059669).withOpacity(0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF059669).withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.person_pin_circle_outlined,
+              color: Color(0xFF059669),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'My Class Advisor',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  a.advisorName,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Batch: ${a.rangeLabel}',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: Colors.grey,
+                  ),
+                ),
+                if (_advisorMobile.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      const Icon(Icons.call, size: 13, color: Color(0xFF059669)),
+                      const SizedBox(width: 4),
+                      Text(
+                        _advisorMobile,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF059669),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SectionCard extends StatelessWidget {
   final int index;
   final String label;

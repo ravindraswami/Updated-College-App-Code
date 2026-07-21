@@ -35,8 +35,6 @@ class ExamFormService {
   }
 
   // ── CC (Class Coordinator) ─────────────────────────────────
-  // Query by classId — same format stored in both student and CC profiles
-  // No composite index needed — single where() only
   Stream<List<ExamFormModel>> getPendingForCC(String classId) {
     return _db
         .collection(_col)
@@ -45,7 +43,6 @@ class ExamFormService {
         .map((s) {
           final list = s.docs
               .map((d) => ExamFormModel.fromMap(d.data(), d.id))
-              // Filter pending_cc in Dart (avoids composite index)
               .where((f) => f.status == 'pending_cc')
               .toList();
           list.sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
@@ -53,11 +50,7 @@ class ExamFormService {
         });
   }
 
-  Future<void> ccApprove(
-    String formId,
-    String ccName, {
-    String remarks = '',
-  }) async {
+  Future<void> ccApprove(String formId, String ccName, {String remarks = ''}) async {
     await _db.collection(_col).doc(formId).update({
       'status': 'pending_technical',
       'ccApprovedBy': ccName,
@@ -79,20 +72,35 @@ class ExamFormService {
     return _db.collection(_col).snapshots().map((s) {
       final list = s.docs
           .map((d) => ExamFormModel.fromMap(d.data(), d.id))
-          .where(
-            (f) => f.status == 'pending_technical' || f.status == 'fee_paid',
-          )
+          .where((f) =>
+              f.status == 'pending_technical' || f.status == 'fee_paid')
           .toList();
       list.sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
       return list;
     });
   }
 
-  // Technical sets fee
+  // Technical sets fee (old simple method — kept for compatibility)
   Future<void> addFee(String formId, double amount) async {
     await _db.collection(_col).doc(formId).update({
       'feeAdded': true,
       'feeAmount': amount,
+      'status': 'fee_pending',
+    });
+  }
+
+  // Technical sets per-subject fees with breakdown stored in the form doc
+  Future<void> addFeeWithBreakdown(
+    String formId,
+    double totalAmount,
+    Map<String, double> regularFees,
+    Map<String, double> backlogFees,
+  ) async {
+    await _db.collection(_col).doc(formId).update({
+      'feeAdded': true,
+      'feeAmount': totalAmount,
+      'subjectRegularFees': regularFees,
+      'subjectBacklogFees': backlogFees,
       'status': 'fee_pending',
     });
   }
@@ -114,7 +122,21 @@ class ExamFormService {
     });
   }
 
-  // All forms (principal / analytics)
+  // All approved forms (principal / hall tickets)
+  Stream<List<ExamFormModel>> getApprovedForms() {
+    return _db
+        .collection(_col)
+        .where('status', isEqualTo: 'approved')
+        .snapshots()
+        .map((s) {
+          final list = s.docs
+              .map((d) => ExamFormModel.fromMap(d.data(), d.id))
+              .toList();
+          list.sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
+          return list;
+        });
+  }
+
   Stream<List<ExamFormModel>> getAllForms() {
     return _db.collection(_col).snapshots().map((s) {
       final list = s.docs

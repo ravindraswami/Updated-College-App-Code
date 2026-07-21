@@ -12,7 +12,7 @@ class UserModel {
   final String coordinatorId; // for students: their coordinator's UID
 
   // For coordinators: which student slot they manage
-  // HOD sets: slotStart=1, slotEnd=20 for CC-1; slotStart=21, slotEnd=40 for CC-2
+  // Incharge sets: slotStart=1, slotEnd=20 for CC-1; slotStart=21, slotEnd=40 for CC-2
   // -1 means no limit (all students in class)
   final int slotStart; // inclusive, 1-based
   final int slotEnd; // inclusive
@@ -30,9 +30,11 @@ class UserModel {
   final String abcId;
   final String aadharNo;
   final String dob;
+  final String admissionDate; // Year of admission (date)
   final String mobile;
   final String email;
   final String maritalStatus;
+  final String gender;
 
   // ── Address ───────────────────────────────────────────────
   final String address;
@@ -81,9 +83,11 @@ class UserModel {
     this.abcId = '',
     this.aadharNo = '',
     this.dob = '',
+    this.admissionDate = '',
     this.mobile = '',
     this.email = '',
     this.maritalStatus = '',
+    this.gender = '',
     this.address = '',
     this.state = '',
     this.district = '',
@@ -133,9 +137,11 @@ class UserModel {
       abcId: map['abcId'] ?? '',
       aadharNo: map['aadharNo'] ?? '',
       dob: map['dob'] ?? '',
+      admissionDate: map['admissionDate'] ?? '',
       mobile: map['mobile'] ?? '',
       email: map['email'] ?? '',
       maritalStatus: map['maritalStatus'] ?? '',
+      gender: map['gender'] ?? '',
       address: map['address'] ?? '',
       state: map['state'] ?? '',
       district: map['district'] ?? '',
@@ -177,9 +183,11 @@ class UserModel {
     'abcId': abcId,
     'aadharNo': aadharNo,
     'dob': dob,
+    'admissionDate': admissionDate,
     'mobile': mobile,
     'email': email,
     'maritalStatus': maritalStatus,
+    'gender': gender,
     'address': address,
     'state': state,
     'district': district,

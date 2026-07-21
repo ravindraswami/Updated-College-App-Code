@@ -19,6 +19,10 @@ class IdService {
         return 'PROF';
       case 'coordinator':
         return 'CC';
+      case 'ug_incharge':
+        return 'UGI';
+      case 'pg_incharge':
+        return 'PGI';
       case 'hod':
         return 'HOD';
       case 'principal':
