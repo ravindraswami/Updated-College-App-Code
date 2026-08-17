@@ -30,9 +30,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _taluka;
   String? _village;
   String _hostelFacility = 'No';
-  // Staff editable
+  // Staff editable — every field except role can be edited by the staff
+  // member themselves.
   late TextEditingController _nameCtrl;
   late TextEditingController _phoneCtrl;
+  late TextEditingController _departmentCtrl;
 
   @override
   void initState() {
@@ -49,6 +51,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         : 'No';
     _nameCtrl = TextEditingController(text: widget.user.name);
     _phoneCtrl = TextEditingController(text: widget.user.phone);
+    _departmentCtrl = TextEditingController(text: widget.user.department);
   }
 
   @override
@@ -58,6 +61,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _addressCtrl.dispose();
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
+    _departmentCtrl.dispose();
     super.dispose();
   }
 
@@ -75,9 +79,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (_village != null) data['village'] = _village;
         data['hostelFacility'] = _hostelFacility;
       } else {
+        // Staff can edit every field on their own profile except role.
         data['name'] = _nameCtrl.text.trim();
         data['phone'] = _phoneCtrl.text.trim();
         data['address'] = _addressCtrl.text.trim();
+        data['department'] = _departmentCtrl.text.trim();
       }
       await _authService.updateProfile(widget.user.id, data);
       if (!mounted) return;
@@ -407,7 +413,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ? widget.user.phone
                                   : '—',
                             ),
-                      _row('Department', widget.user.department),
+                      _isEditing
+                          ? _editField(
+                              _departmentCtrl,
+                              'Department',
+                              Icons.apartment_outlined,
+                            )
+                          : _row('Department', widget.user.department),
                       _row('ERP ID', widget.user.erpId),
                       _row(
                         'Status',

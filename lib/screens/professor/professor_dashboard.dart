@@ -8,6 +8,7 @@ import '../../widgets/app_drawer.dart';
 import '../../widgets/common_widgets.dart';
 import '../auth/login_screen.dart';
 import 'subject_management_screen.dart';
+import 'course_teacher_registration_screen.dart';
 import '../profile/profile_screen.dart';
 import '../notes/notes_screen.dart';
 import '../notes/upload_note_screen.dart';
@@ -44,6 +45,11 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
       label: 'Subjects',
       icon: Icons.list_alt_outlined,
       selectedIcon: Icons.list_alt,
+    ),
+    DrawerItem(
+      label: 'Registration Forms',
+      icon: Icons.edit_document,
+      selectedIcon: Icons.edit_document,
     ),
   ];
 
@@ -97,6 +103,11 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
         return const NotesScreen();
       case 3:
         return SubjectManagementScreen(user: _user!, canAdd: false);
+      case 4:
+        return CourseTeacherRegistrationScreen(
+          teacherId: _user!.id,
+          teacherName: _user!.name,
+        );
       default:
         return ExamManagementScreen(professorId: _user!.id);
     }

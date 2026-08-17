@@ -13,6 +13,7 @@ import '../professor/subject_management_screen.dart';
 import 'hod_assignment_screen.dart';
 import '../auth/login_screen.dart';
 import '../profile/profile_screen.dart';
+import 'student_profile_edit_screen.dart';
 
 class HodDashboard extends StatefulWidget {
   const HodDashboard({super.key});
@@ -354,6 +355,12 @@ class _StudentsTab extends StatelessWidget {
                   style: const TextStyle(fontSize: 12),
                 ),
                 isThreeLine: true,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => StudentProfileEditScreen(student: s),
+                  ),
+                ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -363,6 +370,16 @@ class _StudentsTab extends StatelessWidget {
                       size: 20,
                     ),
                     const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, color: AppTheme.primary),
+                      tooltip: 'View / Edit Profile',
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => StudentProfileEditScreen(student: s),
+                        ),
+                      ),
+                    ),
                     IconButton(
                       icon: const Icon(
                         Icons.delete_outline,

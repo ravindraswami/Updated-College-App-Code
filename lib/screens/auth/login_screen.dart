@@ -10,6 +10,7 @@ import '../hod/hod_dashboard.dart';
 import '../principal/principal_dashboard.dart';
 import '../technical/technical_dashboard.dart';
 import '../non_technical/non_technical_dashboard.dart';
+import '../scholarship/scholarship_dashboard.dart';
 import '../legal/legal_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -98,6 +99,9 @@ class _LoginScreenState extends State<LoginScreen> {
         break;
       case 'non_technical':
         screen = const NonTechnicalDashboard();
+        break;
+      case 'scholarship':
+        screen = const ScholarshipDashboard();
         break;
       default:
         screen = const StudentDashboard();

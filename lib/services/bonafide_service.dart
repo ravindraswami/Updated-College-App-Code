@@ -65,6 +65,12 @@ class BonafideService {
     });
   }
 
+  // Education Section: edit any field on a Bonafide request before/while
+  // approving, then save — mirrors TcService.updateTc.
+  Future<void> updateBonafide(BonafideModel b) async {
+    await _db.collection('bonafide_requests').doc(b.id).update(b.toMap());
+  }
+
   Future<void> rejectBonafide(String bonafideId, String reason) async {
     await _db.collection('bonafide_requests').doc(bonafideId).update({
       'status': 'rejected',

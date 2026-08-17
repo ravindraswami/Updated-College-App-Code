@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../../models/tc_model.dart';
 import '../../services/tc_service.dart';
 import '../../utils/app_theme.dart';
-import 'certificate_pdfs.dart' as cert_pdf;
+import '../../utils/certificate_widgets.dart' as cert;
+import '../shared/certificate_preview_screen.dart';
 
 /// Education Section: full edit form for a Transfer Certificate request.
 /// Every field the student submitted (and a few admin-only ones) can be
@@ -102,19 +103,25 @@ class _TcEditScreenState extends State<TcEditScreen> {
     );
   }
 
-  Future<void> _save({bool andPrint = false}) async {
+  Future<void> _save({bool andGenerate = false}) async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
       final updated = _buildUpdatedModel();
       await _svc.updateTc(updated);
-      if (andPrint) {
-        await cert_pdf.printTransferCert(updated);
+      if (!mounted) return;
+      if (andGenerate) {
+        await openCertificatePreview(
+          context,
+          title: 'Transfer Certificate',
+          fileName: 'TC_${updated.studentName.replaceAll(' ', '_')}',
+          certificate: cert.buildTransferCertCertificate(updated),
+        );
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(andPrint ? 'Saved and sent to print.' : 'TC details saved.'),
+          content: Text(andGenerate ? 'Saved and certificate generated.' : 'TC details saved.'),
           backgroundColor: AppTheme.success,
         ),
       );
@@ -196,7 +203,7 @@ class _TcEditScreenState extends State<TcEditScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _saving ? null : () => _save(andPrint: false),
+                      onPressed: _saving ? null : () => _save(andGenerate: false),
                       icon: const Icon(Icons.save_outlined),
                       label: const Text('Save Only'),
                     ),
@@ -204,7 +211,7 @@ class _TcEditScreenState extends State<TcEditScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: _saving ? null : () => _save(andPrint: true),
+                      onPressed: _saving ? null : () => _save(andGenerate: true),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.success,
                       ),
@@ -217,8 +224,8 @@ class _TcEditScreenState extends State<TcEditScreen> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Icon(Icons.print),
-                      label: const Text('Save & Print'),
+                          : const Icon(Icons.image_outlined),
+                      label: const Text('Save & Generate'),
                     ),
                   ),
                 ],

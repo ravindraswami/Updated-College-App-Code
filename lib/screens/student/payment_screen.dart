@@ -5,9 +5,10 @@ import '../../services/bonafide_service.dart';
 import '../../services/tc_service.dart';
 import '../../services/character_cert_service.dart';
 import '../../services/scholarship_service.dart';
+import '../../services/exam_form_service.dart';
 import '../../utils/app_theme.dart';
 
-enum PaymentFor { bonafide, tc, character, scholarship }
+enum PaymentFor { bonafide, tc, character, scholarship, registration }
 
 class PaymentScreen extends StatefulWidget {
   final String requestId;
@@ -145,6 +146,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
             paymentDate: payDate,
           );
           break;
+        case PaymentFor.registration:
+          await ExamFormService().payRegistrationFee(widget.requestId, txnId);
+          break;
       }
 
       if (!mounted) return;
@@ -157,8 +161,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
           duration: Duration(seconds: 5),
         ),
       );
-      Navigator.pop(context);
-      Navigator.pop(context);
+      // NOTE: pop ONLY once here. This screen may sit directly on top of a
+      // dashboard tab body (not a separately-pushed route), so a second
+      // pop was closing that dashboard too and showing a black screen.
+      Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
       _snack('Submission failed: ${e.toString()}', isError: true);
@@ -186,6 +192,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
         return 'Character Certificate';
       case PaymentFor.scholarship:
         return 'Scholarship';
+      case PaymentFor.registration:
+        return 'Registration Form';
     }
   }
 
@@ -308,6 +316,38 @@ class _PaymentScreenState extends State<PaymentScreen> {
               done: _txnCtrl.text.isNotEmpty && _dateCtrl.text.isNotEmpty,
               child: Column(
                 children: [
+                  // Auto-filled reminder of exactly how much was to be
+                  // paid, shown right where the student enters the
+                  // transaction proof so there's no confusion.
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.currency_rupee, size: 16, color: AppTheme.primary),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Amount to pay: ₹ ${widget.amount.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: AppTheme.primary,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          'For: $_title',
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: _txnCtrl,
                     textCapitalization: TextCapitalization.characters,

@@ -12,6 +12,7 @@ import 'screens/hod/hod_dashboard.dart';
 import 'screens/principal/principal_dashboard.dart';
 import 'screens/technical/technical_dashboard.dart';
 import 'screens/non_technical/non_technical_dashboard.dart';
+import 'screens/scholarship/scholarship_dashboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -93,6 +94,8 @@ class _NotifRouteState extends State<_NotifRoute> {
         return const TechnicalDashboard();
       case 'non_technical':
         return const NonTechnicalDashboard();
+      case 'scholarship':
+        return const ScholarshipDashboard();
       default:
         int tab = 0;
         if (widget.screen == 'exam_list') tab = 0;
@@ -155,6 +158,9 @@ class _SplashScreenState extends State<SplashScreen> {
         break;
       case 'non_technical':
         home = const NonTechnicalDashboard();
+        break;
+      case 'scholarship':
+        home = const ScholarshipDashboard();
         break;
       default:
         home = const StudentDashboard();

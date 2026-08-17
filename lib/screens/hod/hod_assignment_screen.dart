@@ -7,6 +7,7 @@ import '../../services/user_service.dart';
 import '../../services/class_advisor_assignment_service.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/academic_data.dart';
+import '../../utils/class_constants.dart';
 import '../../widgets/common_widgets.dart';
 
 /// Thin wrapper with its own Scaffold + AppBar, for full-screen navigation.
@@ -45,6 +46,7 @@ class _HodAssignmentBodyState extends State<HodAssignmentBody> {
   String _selBranch = AcademicData.branches.first['id'] as String;
   String? _selSemChip; // currently expanded semester id
   String? _selAdvisorYear;
+  String? _selAdvisorSem;
   String? _selAdvisorId;
   String? _selAdvisorName;
   bool _savingAdvisor = false;
@@ -80,7 +82,7 @@ class _HodAssignmentBodyState extends State<HodAssignmentBody> {
       SnackBar(
         content: Text(msg),
         backgroundColor: isError ? AppTheme.error : AppTheme.success,
-        duration: const Duration(seconds: 3),
+        duration: Duration(seconds: isError ? 6 : 3),
       ),
     );
   }
@@ -92,8 +94,22 @@ class _HodAssignmentBodyState extends State<HodAssignmentBody> {
       _snack('Please enter register number range.', isError: true);
       return;
     }
+    final startNum = int.tryParse(RegExp(r'\d+$').stringMatch(start) ?? '');
+    final endNum = int.tryParse(RegExp(r'\d+$').stringMatch(end) ?? '');
+    if (startNum == null || endNum == null) {
+      _snack('Register number range must end in digits, e.g. 001 or VDCOAB2026001.', isError: true);
+      return;
+    }
+    if (startNum > endNum) {
+      _snack('"Reg No From" must be less than or equal to "Reg No To".', isError: true);
+      return;
+    }
     if (_selAdvisorYear == null) {
       _snack('Please select year.', isError: true);
+      return;
+    }
+    if (_selAdvisorSem == null) {
+      _snack('Please select semester.', isError: true);
       return;
     }
     if (_selAdvisorId == null) {
@@ -107,6 +123,7 @@ class _HodAssignmentBodyState extends State<HodAssignmentBody> {
           id: '',
           branch: _selBranch,
           year: _selAdvisorYear!,
+          semester: _selAdvisorSem!,
           regNoStart: start,
           regNoEnd: end,
           advisorId: _selAdvisorId!,
@@ -114,15 +131,28 @@ class _HodAssignmentBodyState extends State<HodAssignmentBody> {
           createdAt: DateTime.now(),
         ),
       );
+      // Also activate the Advisor's own dashboard (My Class Students,
+      // Scholarship review, Notes, home screen) — those all read
+      // classId/slotStart/slotEnd directly off the advisor's account,
+      // which the range-assignment above does NOT touch on its own.
+      final classId = ClassConstants.buildClassId(_selBranch, _selAdvisorSem!);
+      await _userSvc.assignClassToCoordinator(
+        coordinatorId: _selAdvisorId!,
+        classId: classId,
+        classLabel: ClassConstants.labelFor(classId),
+        slotStart: startNum,
+        slotEnd: endNum,
+      );
       _regStartCtrl.clear();
       _regEndCtrl.clear();
       setState(() {
         _selAdvisorId = null;
         _selAdvisorName = null;
+        _selAdvisorSem = null;
       });
       _snack('Advisor assigned for range $start – $end.');
     } catch (e) {
-      _snack('Could not save assignment. Please try again.', isError: true);
+      _snack('Could not save assignment: $e', isError: true);
     } finally {
       if (mounted) setState(() => _savingAdvisor = false);
     }
@@ -182,6 +212,7 @@ class _HodAssignmentBodyState extends State<HodAssignmentBody> {
                 _selBranch = v!;
                 _selSemChip = null;
                 _selAdvisorYear = null;
+                _selAdvisorSem = null;
               }),
             ),
 
@@ -261,7 +292,35 @@ class _HodAssignmentBodyState extends State<HodAssignmentBody> {
                   ),
                 )
                 .toList(),
-            onChanged: (v) => setState(() => _selAdvisorYear = v),
+            onChanged: (v) => setState(() {
+              _selAdvisorYear = v;
+              _selAdvisorSem = null;
+            }),
+          ),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            value: _selAdvisorSem,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Semester',
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+            items: _selAdvisorYear == null
+                ? const []
+                : AcademicData.semsForYear(_selBranch, _selAdvisorYear!)
+                    .map(
+                      (s) => DropdownMenuItem(
+                        value: s['id'] as String,
+                        child: Text(s['label'] as String,
+                            overflow: TextOverflow.ellipsis),
+                      ),
+                    )
+                    .toList(),
+            onChanged: _selAdvisorYear == null
+                ? null
+                : (v) => setState(() => _selAdvisorSem = v),
+            hint: const Text('Select year first'),
           ),
           const SizedBox(height: 10),
           Row(
@@ -296,6 +355,20 @@ class _HodAssignmentBodyState extends State<HodAssignmentBody> {
             stream: _userSvc.getUsersByRole('coordinator'),
             builder: (ctx, snap) {
               final advisors = snap.data ?? [];
+              if (snap.hasData && advisors.isEmpty) {
+                return Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.warning.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'No Advisor accounts found yet. An Advisor must register '
+                    'and be approved before you can assign a range to them.',
+                    style: TextStyle(fontSize: 12, color: AppTheme.warning),
+                  ),
+                );
+              }
               return DropdownButtonFormField<String>(
                 value: _selAdvisorId,
                 isExpanded: true,
@@ -419,7 +492,9 @@ class _AdvisorCard extends StatelessWidget {
                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                   Text(
-                    AcademicData.yearFullLabel(a.year),
+                    a.semester.isNotEmpty
+                        ? '${AcademicData.yearFullLabel(a.year)} · ${a.semester}'
+                        : AcademicData.yearFullLabel(a.year),
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 11, color: Colors.grey),
                   ),
@@ -621,7 +696,7 @@ class _SummaryPanel extends StatelessWidget {
                     (a) => Padding(
                       padding: const EdgeInsets.symmetric(vertical: 2),
                       child: Text(
-                        '${a.rangeLabel} (${AcademicData.yearFullLabel(a.year)})  →  ${a.advisorName}',
+                        '${a.rangeLabel} (${AcademicData.yearFullLabel(a.year)}${a.semester.isNotEmpty ? " · ${a.semester}" : ""})  →  ${a.advisorName}',
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 12),
                       ),

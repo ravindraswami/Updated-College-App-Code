@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import '../../services/auth_service.dart';
 import '../../services/scholarship_service.dart';
 import '../../services/bonafide_service.dart';
@@ -18,11 +15,14 @@ import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../auth/login_screen.dart';
 import '../profile/profile_screen.dart';
-import '../exam_form/exam_form_technical_tab.dart';
+import 'registration_education_screen.dart';
 import '../principal/monthly_report_screen.dart';
 import 'fee_settings_screen.dart';
 import 'tc_edit_screen.dart';
-import 'certificate_pdfs.dart' as cert_pdf;
+import '../../utils/certificate_widgets.dart' as cert;
+import '../shared/certificate_preview_screen.dart';
+import 'bonafide_edit_screen.dart';
+import 'character_cert_edit_screen.dart';
 
 class TechnicalDashboard extends StatefulWidget {
   const TechnicalDashboard({super.key});
@@ -68,12 +68,10 @@ class _TechnicalDashboardState extends State<TechnicalDashboard> {
       case 3:
         return _CharCertTab(svc: _ccSvc, techUid: _user?.id ?? '');
       case 4:
-        return _ScholarshipTab(svc: _scholarshipSvc, user: _user);
+        return RegistrationEducationScreen(educationName: _user?.name ?? '');
       case 5:
-        return ExamFormTechnicalTab(technicalUser: _user);
-      case 6:
         return const MonthlyReportScreen();
-      case 7:
+      case 6:
         return _CertHistoryTab(
           tcSvc: _tcSvc,
           ccSvc: _ccSvc,
@@ -81,7 +79,7 @@ class _TechnicalDashboardState extends State<TechnicalDashboard> {
           examFormSvc: _examFormSvc,
           scholarshipSvc: _scholarshipSvc,
         );
-      case 8:
+      case 7:
         return const FeeSettingsScreen();
       default:
         return _TechHomeTab(
@@ -163,8 +161,7 @@ class _TechnicalDashboardState extends State<TechnicalDashboard> {
       'Bonafide Requests',
       'TC Requests',
       'Character Certificates',
-      'Scholarship Reviews',
-      'Exam Forms',
+      'Registration Forms',
       'Monthly Reports',
       'Certificate Print History',
       'Fee Settings',
@@ -340,71 +337,18 @@ class _TechHomeTab extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: StreamBuilder<List<ExamFormModel>>(
-                  stream: examFormSvc.getPendingForTechnical(),
+                  stream: examFormSvc.getPendingPaymentVerification(),
                   builder: (_, snap) => _CountCard(
-                    title: 'Exam Forms',
-                    subtitle: 'Awaiting review',
+                    title: 'Registration Forms',
+                    subtitle: 'Payments to verify',
                     count: snap.data?.length ?? 0,
                     icon: Icons.edit_document,
                     color: const Color(0xFF1D4ED8),
-                    onTap: () => _goToTab(context, 5),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              const Spacer(),
-              Expanded(
-                child: StreamBuilder<List<ScholarshipModel>>(
-                  stream: scholarshipSvc.getPendingTechnical(),
-                  builder: (_, snap) => _CountCard(
-                    title: 'Scholarship',
-                    subtitle: 'Awaiting review',
-                    count: snap.data?.length ?? 0,
-                    icon: Icons.school,
-                    color: color,
                     onTap: () => _goToTab(context, 4),
                   ),
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 20),
-
-          // ── Recent activity ────────────────────────────────
-          const Text(
-            'Recent Scholarship Activity',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
-          StreamBuilder<List<ScholarshipModel>>(
-            stream: scholarshipSvc.getAllScholarships(),
-            builder: (_, snap) {
-              if (!snap.hasData) return const LoadingWidget();
-              final list = snap.data!.take(5).toList();
-              if (list.isEmpty) {
-                return const Text(
-                  'No activity yet.',
-                  style: TextStyle(color: Colors.grey),
-                );
-              }
-              return Column(
-                children: list
-                    .map(
-                      (s) => _ActivityTile(
-                        title: s.studentName,
-                        subtitle:
-                            '${s.scholarshipType} • ${_statusLabel(s.status)}',
-                        icon: Icons.school_outlined,
-                        statusColor: _statusColor(s.status),
-                      ),
-                    )
-                    .toList(),
-              );
-            },
           ),
         ],
       ),
@@ -695,12 +639,20 @@ class _ApprovedBonafideCard extends StatelessWidget {
   final BonafideModel bonafide;
   const _ApprovedBonafideCard({required this.bonafide});
 
-  Future<void> _printCert(BuildContext context) async {
-    await cert_pdf.printBonafide(bonafide);
+  Future<void> _generate(BuildContext context) async {
+    await openCertificatePreview(
+      context,
+      title: 'Bonafide Certificate',
+      fileName: 'Bonafide_${bonafide.studentName.replaceAll(' ', '_')}',
+      certificate: cert.buildBonafideCertificate(bonafide),
+    );
   }
 
-  Future<void> _savePdf(BuildContext context) async {
-    await cert_pdf.saveBonafide(bonafide);
+  void _edit(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => BonafideEditScreen(bonafide: bonafide)),
+    );
   }
 
   @override
@@ -767,9 +719,9 @@ class _ApprovedBonafideCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _savePdf(context),
-                    icon: const Icon(Icons.save_alt, size: 16),
-                    label: const Text('Save PDF'),
+                    onPressed: () => _edit(context),
+                    icon: const Icon(Icons.edit_outlined, size: 16),
+                    label: const Text('Edit'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF7C3AED),
                       side: const BorderSide(color: Color(0xFF7C3AED)),
@@ -779,9 +731,9 @@ class _ApprovedBonafideCard extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _printCert(context),
-                    icon: const Icon(Icons.print, size: 16),
-                    label: const Text('Print'),
+                    onPressed: () => _generate(context),
+                    icon: const Icon(Icons.image_outlined, size: 16),
+                    label: const Text('View / Save / Share'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF7C3AED),
                     ),
@@ -1733,21 +1685,48 @@ class _ApprovedCertTile extends StatelessWidget {
     this.charModel,
   });
 
-  Future<void> _print(BuildContext context) async {
-    if (tcModel != null) { await cert_pdf.printTransferCert(tcModel!); return; }
-    if (charModel != null) { await cert_pdf.printCharacterCert(charModel!); return; }
-    // Scholarship: generic
-    final doc = pw.Document();
-    doc.addPage(pw.Page(build: (_) => pw.Center(child: pw.Text('$name — $certType'))));
-    await Printing.layoutPdf(onLayout: (_) async => await doc.save(), name: '$name.pdf');
+  Future<void> _generate(BuildContext context) async {
+    if (tcModel != null) {
+      await openCertificatePreview(
+        context,
+        title: 'Transfer Certificate',
+        fileName: 'TC_${name.replaceAll(' ', '_')}',
+        certificate: cert.buildTransferCertCertificate(tcModel!),
+      );
+      return;
+    }
+    if (charModel != null) {
+      await openCertificatePreview(
+        context,
+        title: 'Character Certificate',
+        fileName: 'CharacterCert_${name.replaceAll(' ', '_')}',
+        certificate: cert.buildCharacterCertCertificate(charModel!),
+      );
+      return;
+    }
+    // Scholarship / generic
+    await openCertificatePreview(
+      context,
+      title: certType,
+      fileName: '${certType}_${name.replaceAll(' ', '_')}',
+      certificate: cert.buildGenericCertificate(
+        name: name,
+        certType: certType,
+        detail: detail,
+        docId: certId,
+      ),
+    );
   }
 
-  Future<void> _save(BuildContext context) async {
-    if (tcModel != null) { await cert_pdf.saveTransferCert(tcModel!); return; }
-    if (charModel != null) { await cert_pdf.saveCharacterCert(charModel!); return; }
-    final doc = pw.Document();
-    doc.addPage(pw.Page(build: (_) => pw.Center(child: pw.Text('$name — $certType'))));
-    await Printing.sharePdf(bytes: await doc.save(), filename: '$name.pdf');
+  void _edit(BuildContext context) {
+    if (tcModel != null) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => TcEditScreen(tc: tcModel!)));
+    } else if (charModel != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => CharacterCertEditScreen(cert: charModel!)),
+      );
+    }
   }
 
   @override
@@ -1804,9 +1783,9 @@ class _ApprovedCertTile extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _save(context),
-                    icon: const Icon(Icons.save_alt, size: 16),
-                    label: const Text('Save PDF'),
+                    onPressed: (tcModel != null || charModel != null) ? () => _edit(context) : null,
+                    icon: const Icon(Icons.edit_outlined, size: 16),
+                    label: const Text('Edit'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: color,
                       side: BorderSide(color: color),
@@ -1816,30 +1795,14 @@ class _ApprovedCertTile extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _print(context),
-                    icon: const Icon(Icons.print, size: 16),
-                    label: const Text('Print'),
+                    onPressed: () => _generate(context),
+                    icon: const Icon(Icons.image_outlined, size: 16),
+                    label: const Text('View / Save / Share'),
                     style: ElevatedButton.styleFrom(backgroundColor: color),
                   ),
                 ),
               ],
             ),
-            if (tcModel != null) ...[
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: TextButton.icon(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => TcEditScreen(tc: tcModel!),
-                    ),
-                  ),
-                  icon: const Icon(Icons.edit_outlined, size: 16),
-                  label: const Text('Edit Details'),
-                ),
-              ),
-            ],
           ],
         ),
       ),
@@ -2083,12 +2046,7 @@ class _TechDrawer extends StatelessWidget {
       selectedIcon: Icons.workspace_premium,
     ),
     _DrawerEntry(
-      label: 'Scholarship Reviews',
-      icon: Icons.school_outlined,
-      selectedIcon: Icons.school,
-    ),
-    _DrawerEntry(
-      label: 'Exam Forms',
+      label: 'Registration Forms',
       icon: Icons.edit_document,
       selectedIcon: Icons.edit_document,
     ),
@@ -2269,7 +2227,7 @@ class _CertHistoryTabState extends State<_CertHistoryTab>
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 5, vsync: this);
+    _tab = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -2290,8 +2248,7 @@ class _CertHistoryTabState extends State<_CertHistoryTab>
             Tab(text: 'TC'),
             Tab(text: 'Character Cert'),
             Tab(text: 'Bonafide'),
-            Tab(text: 'Exam Form'),
-            Tab(text: 'Scholarship'),
+            Tab(text: 'Registration Form'),
           ],
         ),
         Expanded(
@@ -2329,17 +2286,14 @@ class _CertHistoryTabState extends State<_CertHistoryTab>
                 ),
               ),
               _HistoryList<ExamFormModel>(
-                stream: widget.examFormSvc.getApprovedForms(),
-                title: 'Exam Form',
+                stream: widget.examFormSvc.getCompletedRegistrations(),
+                title: 'Registration Form',
                 rowBuilder: (item) => _HistoryRow(
-                  studentName: item.studentId, // ExamForm has no studentName
+                  studentName: item.name,
                   studentId: item.studentId,
-                  date: item.submittedAt.toString().split(' ')[0],
+                  date: item.advisorApprovedDate,
                   reason: '${item.branch} – ${item.year} – ${item.semester}',
                 ),
-              ),
-              _ScholarshipHistoryList(
-                stream: widget.scholarshipSvc.getApprovedScholarships(),
               ),
             ],
           ),
@@ -2380,8 +2334,8 @@ class _HistoryList<T> extends StatelessWidget {
               child: Align(
                 alignment: Alignment.centerRight,
                 child: ElevatedButton.icon(
-                  icon: const Icon(Icons.picture_as_pdf),
-                  label: const Text('Print Report (PDF)'),
+                  icon: const Icon(Icons.image_outlined),
+                  label: const Text('Generate Report (Image)'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0F766E),
                     foregroundColor: Colors.white,
@@ -2405,145 +2359,89 @@ class _HistoryList<T> extends StatelessWidget {
 
   Future<void> _printPdf(
       BuildContext context, List<T> items, String title) async {
-    try {
-      // Build simple HTML report
-      final now = DateTime.now();
-      final dateStr =
-          '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
-      final rows = items.map((item) {
-        String name = '', id = '', date = '', reason = '';
-        if (item is TcModel) {
-          name = item.studentName;
-          id = item.studentId;
-          date = item.approvedDate;
-          reason = item.reasonForLeaving;
-        } else if (item is CharacterCertModel) {
-          name = item.studentName;
-          id = item.studentId;
-          date = item.approvedDate;
-          reason = item.purpose;
-        } else if (item is BonafideModel) {
-          name = item.studentName;
-          id = item.studentId;
-          date = item.approvedDate;
-          reason = item.purpose;
-        } else if (item is ExamFormModel) {
-          name = item.studentId;
-          id = item.studentId;
-          date = item.submittedAt.toString().split(' ')[0];
-          reason = '${item.branch} – ${item.year} – ${item.semester}';
-        } else if (item is ScholarshipModel) {
-          name = item.studentName;
-          id = item.studentId;
-          date = item.createdAt.toString().split(' ')[0];
-          reason = item.scholarshipType;
-        }
-        return '<tr>'
-            '<td>$name</td>'
-            '<td>$id</td>'
-            '<td>$date</td>'
-            '<td>$reason</td>'
-            '</tr>';
-      }).join();
-
-      final html = '''<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8"/>
-<style>
-  body { font-family: Arial, sans-serif; margin: 24px; }
-  h2 { color: #0F766E; }
-  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-  th { background: #0F766E; color: #fff; padding: 8px; text-align: left; }
-  td { padding: 7px 8px; border-bottom: 1px solid #ddd; }
-  tr:nth-child(even) td { background: #f5f5f5; }
-  .meta { font-size: 13px; color: #555; margin-bottom: 4px; }
-</style>
-</head>
-<body>
-  <h2>$title – Approved Print History</h2>
-  <p class="meta">Generated on: $dateStr</p>
-  <p class="meta">Total records: ${items.length}</p>
-  <table>
-    <thead>
-      <tr>
-        <th>Student Name</th>
-        <th>Student ID</th>
-        <th>Date</th>
-        <th>Reason / Type</th>
-      </tr>
-    </thead>
-    <tbody>$rows</tbody>
-  </table>
-</body>
-</html>''';
-
-      // Show share/print dialog using the printing package (already in pubspec)
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Generating PDF report…'),
-              duration: Duration(seconds: 2)),
-        );
+    final now = DateTime.now();
+    final dateStr =
+        '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+    final rows = items.map((item) {
+      String name = '', id = '', date = '', reason = '';
+      if (item is TcModel) {
+        name = item.studentName;
+        id = item.studentId;
+        date = item.approvedDate;
+        reason = item.reasonForLeaving;
+      } else if (item is CharacterCertModel) {
+        name = item.studentName;
+        id = item.studentId;
+        date = item.approvedDate;
+        reason = item.purpose;
+      } else if (item is BonafideModel) {
+        name = item.studentName;
+        id = item.studentId;
+        date = item.approvedDate;
+        reason = item.purpose;
+      } else if (item is ExamFormModel) {
+        name = item.studentId;
+        id = item.studentId;
+        date = item.submittedAt.toString().split(' ')[0];
+        reason = '${item.branch} \u2013 ${item.year} \u2013 ${item.semester}';
+      } else if (item is ScholarshipModel) {
+        name = item.studentName;
+        id = item.studentId;
+        date = item.createdAt.toString().split(' ')[0];
+        reason = item.scholarshipType;
       }
-      // Write html to a temp and open
-      await _openHtmlAsPdf(context, html, title);
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    }
-  }
+      return [name, id, date, reason];
+    }).toList();
 
-  Future<void> _openHtmlAsPdf(
-      BuildContext context, String html, String title) async {
-    // Use printing package to print/share as PDF
-    // Add import at top of this widget file
-    // We pass to the OS print dialogue
-    try {
-      // ignore: undefined_prefixed_name
-      // Use dart:html on web, or share on mobile
-      // For Flutter mobile: use printing package
-      // The printing package exposes Printing.layoutPdf
-      // This depends on `printing` being in pubspec.yaml.
-      // We show the HTML in a dialog as fallback if printing not available.
-      if (context.mounted) {
-        await showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: Text('$title – Print Report'),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.picture_as_pdf,
-                      size: 48, color: Color(0xFF0F766E)),
-                  const SizedBox(height: 8),
-                  Text('Report ready with ${html.split('<tr>').length - 2} records.'),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'To print: integrate the `printing` package and call Printing.layoutPdf(). The HTML report is generated and ready.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
+    final reportWidget = cert.reportSheet(
+      width: 1000,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          cert.buildLetterheadBlock(),
+          const SizedBox(height: 10),
+          Text('$title \u2013 Approved History',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F766E))),
+          const SizedBox(height: 4),
+          Text('Generated on: $dateStr', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          Text('Total records: ${items.length}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400, width: 0.6)),
+            child: Table(
+              border: TableBorder.all(color: Colors.grey.shade400, width: 0.6),
+              children: [
+                TableRow(
+                  decoration: const BoxDecoration(color: Color(0xFF0F766E)),
+                  children: ['Student Name', 'Student ID', 'Date', 'Reason / Type']
+                      .map((h) => Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                            child: Text(h, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+                          ))
+                      .toList(),
+                ),
+                ...rows.map((r) => TableRow(
+                      children: r
+                          .map((v) => Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                child: Text(v, style: const TextStyle(fontSize: 9.5)),
+                              ))
+                          .toList(),
+                    )),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
-              ),
-            ],
           ),
-        );
-      }
-    } catch (e) {
-      debugPrint('PDF error: $e');
-    }
+        ],
+      ),
+    );
+
+    if (!context.mounted) return;
+    await openCertificatePreview(
+      context,
+      title: '$title \u2013 History',
+      fileName: '${title.replaceAll(' ', '_')}_History',
+      certificate: reportWidget,
+    );
   }
 }
 
@@ -2694,8 +2592,8 @@ class _ScholarshipHistoryListState extends State<_ScholarshipHistoryList> {
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: ElevatedButton.icon(
-                    icon: const Icon(Icons.picture_as_pdf),
-                    label: const Text('Print Report (PDF)'),
+                    icon: const Icon(Icons.image_outlined),
+                    label: const Text('Generate Report (Image)'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0F766E),
                       foregroundColor: Colors.white,
@@ -2729,112 +2627,70 @@ class _ScholarshipHistoryListState extends State<_ScholarshipHistoryList> {
 
   Future<void> _printPdf(
       BuildContext context, List<ScholarshipModel> items) async {
-    try {
-      final now = DateTime.now();
-      final dateStr =
-          '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
-      final rows = items.map((item) {
-        return '<tr>'
-            '<td>${item.studentName}</td>'
-            '<td>${item.studentId}</td>'
-            '<td>${item.createdAt.toString().split(' ')[0]}</td>'
-            '<td>${item.scholarshipType}</td>'
-            '<td>${item.gender}</td>'
-            '</tr>';
-      }).join();
+    final now = DateTime.now();
+    final dateStr =
+        '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+    final rows = items
+        .map((item) => [
+              item.studentName,
+              item.studentId,
+              item.createdAt.toString().split(' ')[0],
+              item.scholarshipType,
+              item.gender,
+            ])
+        .toList();
+    final filterDesc =
+        '${_categoryFilter ?? "All Categories"} \u2022 ${_genderFilter ?? "All Genders"}';
 
-      final filterDesc =
-          '${_categoryFilter ?? "All Categories"} • ${_genderFilter ?? "All Genders"}';
-
-      final html = '''<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8"/>
-<style>
-  body { font-family: Arial, sans-serif; margin: 24px; }
-  h2 { color: #0F766E; }
-  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-  th { background: #0F766E; color: #fff; padding: 8px; text-align: left; }
-  td { padding: 7px 8px; border-bottom: 1px solid #ddd; }
-  tr:nth-child(even) td { background: #f5f5f5; }
-  .meta { font-size: 13px; color: #555; margin-bottom: 4px; }
-</style>
-</head>
-<body>
-  <h2>Scholarship – Approved Print History</h2>
-  <p class="meta">Generated on: $dateStr</p>
-  <p class="meta">Filter: $filterDesc</p>
-  <p class="meta">Total records: ${items.length}</p>
-  <table>
-    <thead>
-      <tr>
-        <th>Student Name</th>
-        <th>Student ID</th>
-        <th>Date</th>
-        <th>Category</th>
-        <th>Gender</th>
-      </tr>
-    </thead>
-    <tbody>$rows</tbody>
-  </table>
-</body>
-</html>''';
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Generating PDF report…'),
-              duration: Duration(seconds: 2)),
-        );
-      }
-      await _openHtmlAsPdfForScholarship(context, html);
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _openHtmlAsPdfForScholarship(
-      BuildContext context, String html) async {
-    try {
-      if (context.mounted) {
-        await showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Scholarship – Print Report'),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.picture_as_pdf,
-                      size: 48, color: Color(0xFF0F766E)),
-                  const SizedBox(height: 8),
-                  Text(
-                      'Report ready with ${html.split('<tr>').length - 2} records.'),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'To print: integrate the `printing` package and call Printing.layoutPdf(). The HTML report is generated and ready.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
+    final reportWidget = cert.reportSheet(
+      width: 1050,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          cert.buildLetterheadBlock(),
+          const SizedBox(height: 10),
+          const Text('Scholarship \u2013 Approved History',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F766E))),
+          const SizedBox(height: 4),
+          Text('Generated on: $dateStr', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          Text('Filter: $filterDesc', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          Text('Total records: ${items.length}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400, width: 0.6)),
+            child: Table(
+              border: TableBorder.all(color: Colors.grey.shade400, width: 0.6),
+              children: [
+                TableRow(
+                  decoration: const BoxDecoration(color: Color(0xFF0F766E)),
+                  children: ['Student Name', 'Student ID', 'Date', 'Category', 'Gender']
+                      .map((h) => Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                            child: Text(h, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+                          ))
+                      .toList(),
+                ),
+                ...rows.map((r) => TableRow(
+                      children: r
+                          .map((v) => Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                child: Text(v, style: const TextStyle(fontSize: 9.5)),
+                              ))
+                          .toList(),
+                    )),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
-              ),
-            ],
           ),
-        );
-      }
-    } catch (e) {
-      debugPrint('PDF error: $e');
-    }
+        ],
+      ),
+    );
+
+    if (!context.mounted) return;
+    await openCertificatePreview(
+      context,
+      title: 'Scholarship \u2013 History',
+      fileName: 'Scholarship_History',
+      certificate: reportWidget,
+    );
   }
 }

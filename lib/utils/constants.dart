@@ -9,6 +9,7 @@ class AppConstants {
     'pg_incharge',
     'non_technical',
     'technical',
+    'scholarship',
   ];
 
   // All roles (used internally)
@@ -21,6 +22,7 @@ class AppConstants {
     'principal',
     'non_technical',
     'technical',
+    'scholarship',
   ];
 
   static const Map<String, String> roleLabels = {
@@ -33,6 +35,7 @@ class AppConstants {
     'principal': 'Principal',
     'non_technical': 'Non-Technical Staff',
     'technical': 'Education Section',
+    'scholarship': 'Scholarship',
   };
 
   static String roleLabel(String role) => roleLabels[role] ?? role;
@@ -59,6 +62,7 @@ class AppConstants {
     'hod',
     'non_technical',
     'technical',
+    'scholarship',
   ];
 
   static bool isStaff(String role) => staffRoles.contains(role);

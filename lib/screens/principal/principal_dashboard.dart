@@ -370,6 +370,7 @@ class _AllStaffTab extends StatelessWidget {
                 'principal',
                 'technical',
                 'non_technical',
+                'scholarship',
               ].contains(u.role),
             )
             .toList();

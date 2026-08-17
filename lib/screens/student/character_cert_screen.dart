@@ -290,7 +290,7 @@ class _CcFormScreenState extends State<_CcFormScreen> {
       );
       if (!mounted) return;
       // 2. Navigate to PaymentScreen with real SBI link
-      Navigator.pushReplacement(
+      Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => PaymentScreen(

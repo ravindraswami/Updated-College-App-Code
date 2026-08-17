@@ -11,7 +11,7 @@ import '../auth/login_screen.dart';
 import '../profile/profile_screen.dart';
 import '../notes/notes_screen.dart';
 import '../notes/upload_note_screen.dart';
-import '../exam_form/exam_form_cc_tab.dart';
+import 'advisor_registration_screen.dart';
 
 class CoordinatorDashboard extends StatefulWidget {
   const CoordinatorDashboard({super.key});
@@ -29,7 +29,7 @@ class _CoordinatorDashboardState extends State<CoordinatorDashboard> {
 
   // Drawer index:
   // 0 = Home, 1 = My Class Students, 2 = Pending Requests,
-  // 3 = Notes, 4 = Exam Forms, 5 = Scholarship Forms
+  // 3 = Notes, 4 = Registration Forms, 5 = Scholarship Forms
   int _drawerIndex = 0;
 
   static const _ccColor = Color(0xFF0891B2);
@@ -39,7 +39,7 @@ class _CoordinatorDashboardState extends State<CoordinatorDashboard> {
     'My Class Students',
     'Pending Requests',
     'Study Materials',
-    'Exam Forms',
+    'Registration Forms',
     'Scholarship Forms',
   ];
 
@@ -98,7 +98,7 @@ class _CoordinatorDashboardState extends State<CoordinatorDashboard> {
       case 4:
         return _user == null
             ? const LoadingWidget()
-            : ExamFormCcTab(coordinator: _user!);
+            : AdvisorRegistrationScreen(coordinator: _user!);
       case 5:
         return _user == null
             ? const LoadingWidget()
@@ -221,7 +221,7 @@ class _CCDrawer extends StatelessWidget {
       selectedIcon: Icons.book,
     ),
     _DrawerEntry(
-      label: 'Exam Forms',
+      label: 'Registration Forms',
       icon: Icons.edit_document,
       selectedIcon: Icons.edit_document,
     ),

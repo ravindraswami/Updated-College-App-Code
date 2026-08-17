@@ -4,8 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 ///
 /// The Education Section (technical role) sets these amounts once from
 /// [FeeSettingsScreen]; every student's Bonafide / Character Certificate /
-/// Transfer Certificate application picks up whatever is currently set
-/// here, instead of a hardcoded amount.
+/// Transfer Certificate / Registration Form application picks up whatever
+/// is currently set here, instead of a hardcoded amount.
 class FeeConfigService {
   final _db = FirebaseFirestore.instance;
   DocumentReference<Map<String, dynamic>> get _docRef =>
@@ -14,6 +14,7 @@ class FeeConfigService {
   static const double defaultBonafideFee = 50.0;
   static const double defaultCharacterFee = 50.0;
   static const double defaultTcFee = 100.0;
+  static const double defaultRegistrationFee = 200.0;
 
   Map<String, double> _fromDoc(Map<String, dynamic>? data) {
     final d = data ?? {};
@@ -21,6 +22,8 @@ class FeeConfigService {
       'bonafideFee': (d['bonafideFee'] ?? defaultBonafideFee).toDouble(),
       'characterFee': (d['characterFee'] ?? defaultCharacterFee).toDouble(),
       'tcFee': (d['tcFee'] ?? defaultTcFee).toDouble(),
+      'registrationFee':
+          (d['registrationFee'] ?? defaultRegistrationFee).toDouble(),
     };
   }
 
@@ -43,11 +46,13 @@ class FeeConfigService {
     required double bonafideFee,
     required double characterFee,
     required double tcFee,
+    double? registrationFee,
   }) async {
     await _docRef.set({
       'bonafideFee': bonafideFee,
       'characterFee': characterFee,
       'tcFee': tcFee,
+      if (registrationFee != null) 'registrationFee': registrationFee,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }

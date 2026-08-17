@@ -17,6 +17,7 @@ class _FeeSettingsScreenState extends State<FeeSettingsScreen> {
   final _bonafideCtrl = TextEditingController();
   final _characterCtrl = TextEditingController();
   final _tcCtrl = TextEditingController();
+  final _registrationCtrl = TextEditingController();
   bool _loading = true;
   bool _saving = false;
 
@@ -31,6 +32,7 @@ class _FeeSettingsScreenState extends State<FeeSettingsScreen> {
     _bonafideCtrl.text = fees['bonafideFee']!.toStringAsFixed(0);
     _characterCtrl.text = fees['characterFee']!.toStringAsFixed(0);
     _tcCtrl.text = fees['tcFee']!.toStringAsFixed(0);
+    _registrationCtrl.text = fees['registrationFee']!.toStringAsFixed(0);
     if (mounted) setState(() => _loading = false);
   }
 
@@ -38,8 +40,10 @@ class _FeeSettingsScreenState extends State<FeeSettingsScreen> {
     final bonafide = double.tryParse(_bonafideCtrl.text.trim());
     final character = double.tryParse(_characterCtrl.text.trim());
     final tc = double.tryParse(_tcCtrl.text.trim());
+    final registration = double.tryParse(_registrationCtrl.text.trim());
     if (bonafide == null || character == null || tc == null ||
-        bonafide < 0 || character < 0 || tc < 0) {
+        registration == null ||
+        bonafide < 0 || character < 0 || tc < 0 || registration < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please enter valid, non-negative fee amounts.'),
@@ -54,6 +58,7 @@ class _FeeSettingsScreenState extends State<FeeSettingsScreen> {
         bonafideFee: bonafide,
         characterFee: character,
         tcFee: tc,
+        registrationFee: registration,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -77,6 +82,7 @@ class _FeeSettingsScreenState extends State<FeeSettingsScreen> {
     _bonafideCtrl.dispose();
     _characterCtrl.dispose();
     _tcCtrl.dispose();
+    _registrationCtrl.dispose();
     super.dispose();
   }
 
@@ -128,6 +134,12 @@ class _FeeSettingsScreenState extends State<FeeSettingsScreen> {
             label: 'Transfer Certificate (TC) Fee',
             icon: Icons.article_outlined,
             controller: _tcCtrl,
+          ),
+          const SizedBox(height: 16),
+          _FeeField(
+            label: 'Registration Form Fee',
+            icon: Icons.assignment_outlined,
+            controller: _registrationCtrl,
           ),
           const SizedBox(height: 24),
           SizedBox(

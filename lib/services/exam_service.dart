@@ -87,18 +87,6 @@ class ExamService {
     }
   }
 
-  /// Live count of questions actually saved for an exam. Used instead of
-  /// the exam's stored `totalQuestions` field so the count shown to the
-  /// professor/student is always correct, even if that field ever drifts
-  /// out of sync (e.g. a partially-failed save).
-  Stream<int> watchQuestionCount(String examId) {
-    return _db
-        .collection('questions')
-        .where('examId', isEqualTo: examId)
-        .snapshots()
-        .map((s) => s.docs.length);
-  }
-
   Future<void> addQuestion(QuestionModel question) async {
     await _db.collection('questions').add(question.toMap());
   }

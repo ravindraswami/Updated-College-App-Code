@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:printing/printing.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import '../../utils/app_theme.dart';
+import '../../utils/certificate_widgets.dart' as certw;
+import '../shared/certificate_preview_screen.dart';
 
-/// Fix 7 — Month-wise PDF report for Bonafide, Character, Transfer, Exam Form, Scholarship
+/// Fix 7 — Month-wise image report for Bonafide, Character, Transfer, Exam Form, Scholarship
 /// Filters by: report type + month + year + (optional) studentId
+/// Report is rendered as a Flutter widget and can only be saved/shared as
+/// an image (no PDF, no print).
 class MonthlyReportScreen extends StatefulWidget {
   const MonthlyReportScreen({super.key});
 
@@ -82,96 +83,88 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
     }
   }
 
-  Future<void> _generatePdf() async {
+  Future<void> _generateReport() async {
     if (_results.isEmpty) return;
     setState(() => _generating = true);
     try {
-      final doc = pw.Document();
       final typeName = _types[_reportType]!.label;
       final monthYear = '${_months[_selectedMonth - 1]} $_selectedYear';
       final studentFilter = _studentIdCtrl.text.trim();
       final now = DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now());
-
-      // Determine columns per type
       final columns = _columnsFor(_reportType);
 
-      doc.addPage(
-        pw.MultiPage(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(28),
-          header: (ctx) => pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text(
-                    '$typeName — Monthly Report',
-                    style: pw.TextStyle(
-                      fontSize: 14, fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                  pw.Text(monthYear,
-                      style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey700)),
-                ],
-              ),
-              pw.SizedBox(height: 2),
-              pw.Row(
-                children: [
-                  pw.Text('Generated: $now',
-                      style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)),
-                  if (studentFilter.isNotEmpty) ...[
-                    pw.SizedBox(width: 16),
-                    pw.Text('Student ID: $studentFilter',
-                        style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)),
-                  ],
-                  pw.SizedBox(width: 16),
-                  pw.Text('Total Records: ${_results.length}',
-                      style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)),
-                ],
-              ),
-              pw.SizedBox(height: 6),
-              pw.Divider(thickness: 1),
-              pw.SizedBox(height: 4),
-            ],
-          ),
-          build: (ctx) => [
-            pw.TableHelper.fromTextArray(
-              headers: columns.map((c) => c.header).toList(),
-              data: _results.map((row) =>
-                columns.map((c) => c.extract(row)).toList()
-              ).toList(),
-              headerStyle: pw.TextStyle(
-                fontWeight: pw.FontWeight.bold, fontSize: 9,
-              ),
-              headerDecoration: const pw.BoxDecoration(color: PdfColors.grey200),
-              cellStyle: const pw.TextStyle(fontSize: 8),
-              cellPadding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-              border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
-              columnWidths: {
-                for (int i = 0; i < columns.length; i++)
-                  i: pw.FlexColumnWidth(columns[i].flex),
-              },
+      final headerRow = TableRow(
+        decoration: BoxDecoration(color: Colors.grey.shade200),
+        children: columns
+            .map((c) => Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+                  child: Text(c.header, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                ))
+            .toList(),
+      );
+      final dataRows = _results
+          .map((row) => TableRow(
+                children: columns
+                    .map((c) => Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+                          child: Text(c.extract(row), style: const TextStyle(fontSize: 8.5)),
+                        ))
+                    .toList(),
+              ))
+          .toList();
+
+      final reportWidget = certw.reportSheet(
+        width: 1300,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            certw.buildLetterheadBlock(),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('$typeName — Monthly Report',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text(monthYear, style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+              ],
             ),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 16,
+              children: [
+                Text('Generated: $now', style: TextStyle(fontSize: 9, color: Colors.grey.shade600)),
+                if (studentFilter.isNotEmpty)
+                  Text('Student ID: $studentFilter', style: TextStyle(fontSize: 9, color: Colors.grey.shade600)),
+                Text('Total Records: ${_results.length}', style: TextStyle(fontSize: 9, color: Colors.grey.shade600)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Divider(thickness: 1),
+            const SizedBox(height: 6),
+            Container(
+              decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400, width: 0.6)),
+              child: Table(
+                border: TableBorder.all(color: Colors.grey.shade400, width: 0.6),
+                children: [headerRow, ...dataRows],
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text('Smart ERP — $typeName Report', style: TextStyle(fontSize: 9, color: Colors.grey.shade600)),
           ],
-          footer: (ctx) => pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text('Smart ERP — $typeName Report',
-                  style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)),
-              pw.Text('Page ${ctx.pageNumber} of ${ctx.pagesCount}',
-                  style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)),
-            ],
-          ),
         ),
       );
 
-      final bytes = await doc.save();
-      await Printing.layoutPdf(onLayout: (_) async => bytes);
+      if (!mounted) return;
+      await openCertificatePreview(
+        context,
+        title: '$typeName — Monthly Report',
+        fileName: 'MonthlyReport_${_reportType}_${_selectedMonth}_$_selectedYear',
+        certificate: reportWidget,
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('PDF Error: $e'), backgroundColor: AppTheme.error),
+          SnackBar(content: Text('Report Error: $e'), backgroundColor: AppTheme.error),
         );
       }
     } finally {
@@ -293,9 +286,9 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white),
                     )
-                  : const Icon(Icons.picture_as_pdf),
-              tooltip: 'Export PDF',
-              onPressed: _generating ? null : _generatePdf,
+                  : const Icon(Icons.image_outlined),
+              tooltip: 'Generate Report Image',
+              onPressed: _generating ? null : _generateReport,
             ),
         ],
       ),
@@ -514,7 +507,7 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
       ),
       floatingActionButton: _results.isNotEmpty
           ? FloatingActionButton.extended(
-              onPressed: _generating ? null : _generatePdf,
+              onPressed: _generating ? null : _generateReport,
               backgroundColor: const Color(0xFF7C3AED),
               icon: _generating
                   ? const SizedBox(
@@ -522,8 +515,8 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white),
                     )
-                  : const Icon(Icons.picture_as_pdf),
-              label: Text(_generating ? 'Generating...' : 'Export PDF'),
+                  : const Icon(Icons.image_outlined),
+              label: Text(_generating ? 'Generating...' : 'Generate Report Image'),
             )
           : null,
     );

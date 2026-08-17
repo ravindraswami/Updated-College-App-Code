@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:printing/printing.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import '../../models/user_model.dart';
 import '../../models/exam_form_model.dart';
 import '../../models/subject_model.dart';
@@ -12,6 +9,8 @@ import '../../services/class_advisor_assignment_service.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/academic_data.dart';
 import '../../widgets/common_widgets.dart';
+import '../../utils/certificate_widgets.dart' as certw;
+import '../shared/certificate_preview_screen.dart';
 
 class ExamFormApplyScreen extends StatelessWidget {
   final UserModel student;
@@ -695,14 +694,11 @@ class _FormStatusCard extends StatefulWidget {
 class _FormStatusCardState extends State<_FormStatusCard> {
   ExamFormModel get form => widget.form;
   ExamFormService get svc => widget.svc;
-  bool _printing = false;
+  bool _generating = false;
 
-  Future<void> _printForm() async {
-    setState(() => _printing = true);
+  Future<void> _generateForm() async {
+    setState(() => _generating = true);
     try {
-      final doc = pw.Document();
-
-      // ── Build regular subject rows: Sr, Code, Title, Credit ──
       final regularRows = <List<String>>[];
       var sr = 1;
       for (final id in form.subjectIds) {
@@ -717,95 +713,57 @@ class _FormStatusCardState extends State<_FormStatusCard> {
       for (final id in form.backlogSubjectIds) {
         final code = form.backlogSubjectCodes[id] ?? '';
         final title = form.backlogSubjectTitles[id] ?? '';
-        final credit =
-            (form.backlogSubjectCredits[id] ?? 0).toStringAsFixed(1);
+        final credit = (form.backlogSubjectCredits[id] ?? 0).toStringAsFixed(1);
         backlogRows.add(['${srB++}', code, title, credit]);
       }
 
-      pw.Widget courseTable(String heading, List<List<String>> rows,
-          int totalCourses, double totalCredit) {
-        return pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
+      Widget courseTable(String heading, List<List<String>> rows, int totalCourses, double totalCredit) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            pw.SizedBox(height: 14),
-            pw.Text(
-              heading,
-              style: pw.TextStyle(
-                  fontSize: 11, fontWeight: pw.FontWeight.bold),
-            ),
-            pw.SizedBox(height: 6),
-            pw.Table(
-              border:
-                  pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
-              columnWidths: {
-                0: const pw.FixedColumnWidth(30),
-                1: const pw.FixedColumnWidth(70),
-                2: const pw.FlexColumnWidth(),
-                3: const pw.FixedColumnWidth(60),
+            const SizedBox(height: 14),
+            Text(heading, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            Table(
+              border: TableBorder.all(color: Colors.grey.shade400, width: 0.6),
+              columnWidths: const {
+                0: FixedColumnWidth(34),
+                1: FixedColumnWidth(80),
+                2: FlexColumnWidth(),
+                3: FixedColumnWidth(60),
               },
               children: [
-                pw.TableRow(
-                  decoration:
-                      const pw.BoxDecoration(color: PdfColors.grey200),
+                TableRow(
+                  decoration: BoxDecoration(color: Colors.grey.shade200),
                   children: ['Sr', 'Course Code', 'Course Title', 'Credit']
-                      .map(
-                        (h) => pw.Padding(
-                          padding: const pw.EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 4),
-                          child: pw.Text(
-                            h,
-                            style: pw.TextStyle(
-                                fontSize: 9, fontWeight: pw.FontWeight.bold),
-                          ),
-                        ),
-                      )
+                      .map((h) => Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                            child: Text(h, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                          ))
                       .toList(),
                 ),
-                ...rows.map(
-                  (r) => pw.TableRow(
-                    children: r
-                        .map(
-                          (v) => pw.Padding(
-                            padding: const pw.EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 4),
-                            child: pw.Text(v,
-                                style: const pw.TextStyle(fontSize: 9)),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ),
-                pw.TableRow(
-                  decoration:
-                      const pw.BoxDecoration(color: PdfColors.grey100),
+                ...rows.map((r) => TableRow(
+                      children: r
+                          .map((v) => Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                                child: Text(v, style: const TextStyle(fontSize: 10)),
+                              ))
+                          .toList(),
+                    )),
+                TableRow(
+                  decoration: BoxDecoration(color: Colors.grey.shade100),
                   children: [
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 4),
-                      child: pw.Text(''),
+                    const Padding(padding: EdgeInsets.symmetric(horizontal: 6, vertical: 5), child: Text('')),
+                    const Padding(padding: EdgeInsets.symmetric(horizontal: 6, vertical: 5), child: Text('')),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                      child: Text('Total Courses: $totalCourses',
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 4),
-                      child: pw.Text(''),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 4),
-                      child: pw.Text(
-                        'Total Courses: $totalCourses',
-                        style: pw.TextStyle(
-                            fontSize: 9, fontWeight: pw.FontWeight.bold),
-                      ),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 4),
-                      child: pw.Text(
-                        totalCredit.toStringAsFixed(1),
-                        style: pw.TextStyle(
-                            fontSize: 9, fontWeight: pw.FontWeight.bold),
-                      ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                      child: Text(totalCredit.toStringAsFixed(1),
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -815,162 +773,99 @@ class _FormStatusCardState extends State<_FormStatusCard> {
         );
       }
 
-      doc.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(36),
-          build: (ctx) => pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.center,
-            children: [
-              pw.Text(
-                'EXAMINATION FORM — APPROVED',
-                style: pw.TextStyle(
-                  fontSize: 16,
-                  fontWeight: pw.FontWeight.bold,
-                  letterSpacing: 1.5,
-                ),
-              ),
-              pw.SizedBox(height: 4),
-              pw.Container(width: 80, height: 2, color: PdfColors.green800),
-              pw.SizedBox(height: 16),
-              pw.Table(
-                border: pw.TableBorder.all(
-                  color: PdfColors.grey400,
-                  width: 0.5,
-                ),
-                columnWidths: {
-                  0: const pw.FixedColumnWidth(160),
-                  1: const pw.FlexColumnWidth(),
-                },
-                children:
-                    [
-                      ['Form ID', form.id.substring(0, 8).toUpperCase()],
-                      ['Session', form.session],
-                      ['Student Name', form.name],
-                      ['Register No.', form.rollNo],
-                      ['Semester', form.semester],
-                      ['Department', form.department],
-                      ['Advisor Name', form.advisorName],
-                      ['Designation', form.advisorDesignation],
-                      ['Status', 'APPROVED ✓'],
-                      ['Fee Paid', '₹${form.feeAmount.toStringAsFixed(0)}'],
-                    ].map((row) {
-                      return pw.TableRow(
-                        children: [
-                          pw.Padding(
-                            padding: const pw.EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 5,
-                            ),
-                            child: pw.Text(
-                              row[0],
-                              style: pw.TextStyle(
-                                fontWeight: pw.FontWeight.bold,
-                                fontSize: 10,
-                              ),
-                            ),
-                          ),
-                          pw.Padding(
-                            padding: const pw.EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 5,
-                            ),
-                            child: pw.Text(
-                              row[1],
-                              style: const pw.TextStyle(fontSize: 10),
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList(),
-              ),
+      final infoRows = [
+        ['Form ID', form.id.substring(0, 8).toUpperCase()],
+        ['Session', form.session],
+        ['Student Name', form.name],
+        ['Register No.', form.rollNo],
+        ['Semester', form.semester],
+        ['Department', form.department],
+        ['Advisor Name', form.advisorName],
+        ['Designation', form.advisorDesignation],
+        ['Status', 'APPROVED \u2713'],
+        ['Fee Paid', '\u20b9${form.feeAmount.toStringAsFixed(0)}'],
+      ];
 
-              if (regularRows.isNotEmpty)
-                courseTable('Regular Subjects', regularRows,
-                    form.totalCourseCount, form.totalCreditSum),
-
-              if (backlogRows.isNotEmpty)
-                courseTable('Backlog Subjects', backlogRows,
-                    form.totalBacklogCourseCount, form.totalBacklogCreditSum),
-
-              pw.SizedBox(height: 16),
-              pw.Align(
-                alignment: pw.Alignment.centerLeft,
-                child: pw.Text(
-                  'Suggestion Codes:  RR = Result Reserved   •   NR = Not Registered   •   OEF = Online Exam Form',
-                  style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
-                ),
-              ),
-
-              pw.SizedBox(height: 40),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Column(
-                    children: [
-                      pw.Container(
-                        width: 100,
-                        height: 1,
-                        color: PdfColors.black,
-                      ),
-                      pw.SizedBox(height: 4),
-                      pw.Text(
-                        'Student Signature',
-                        style: const pw.TextStyle(
-                          fontSize: 9,
-                          color: PdfColors.grey,
+      final reportWidget = certw.reportSheet(
+        width: 850,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            certw.buildLetterheadBlock(),
+            const SizedBox(height: 10),
+            const Text(
+              'EXAMINATION FORM \u2014 APPROVED',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+            ),
+            const SizedBox(height: 6),
+            Container(width: 90, height: 2, color: Colors.green.shade800),
+            const SizedBox(height: 18),
+            Table(
+              border: TableBorder.all(color: Colors.grey.shade400, width: 0.6),
+              columnWidths: const {0: FixedColumnWidth(170), 1: FlexColumnWidth()},
+              children: infoRows
+                  .map((row) => TableRow(children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          child: Text(row[0], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                         ),
-                      ),
-                    ],
-                  ),
-                  pw.Column(
-                    children: [
-                      pw.Container(
-                        width: 130,
-                        height: 1,
-                        color: PdfColors.black,
-                      ),
-                      pw.SizedBox(height: 4),
-                      pw.Text(
-                        'Advisor Signature (${form.advisorName})',
-                        style: const pw.TextStyle(
-                          fontSize: 9,
-                          color: PdfColors.grey,
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          child: Text(row[1], style: const TextStyle(fontSize: 11)),
                         ),
-                      ),
-                    ],
-                  ),
-                  pw.Column(
-                    children: [
-                      pw.Container(
-                        width: 130,
-                        height: 1,
-                        color: PdfColors.black,
-                      ),
-                      pw.SizedBox(height: 4),
-                      pw.Text(
-                        'Principal / Controller of Examinations',
-                        style: const pw.TextStyle(
-                          fontSize: 9,
-                          color: PdfColors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ]))
+                  .toList(),
+            ),
+            if (regularRows.isNotEmpty)
+              courseTable('Regular Subjects', regularRows, form.totalCourseCount, form.totalCreditSum),
+            if (backlogRows.isNotEmpty)
+              courseTable('Backlog Subjects', backlogRows, form.totalBacklogCourseCount, form.totalBacklogCreditSum),
+            const SizedBox(height: 18),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Suggestion Codes:  RR = Result Reserved   \u2022   NR = Not Registered   \u2022   OEF = Online Exam Form',
+                style: TextStyle(fontSize: 9, color: Colors.grey.shade700),
               ),
-              pw.SizedBox(height: 20),
-              pw.Divider(color: PdfColors.grey300),
-              pw.Text(
-                'Generated via Smart ERP • ${DateFormat('dd MMM yyyy').format(DateTime.now())}',
-                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 44),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(children: [
+                  Container(width: 100, height: 1, color: Colors.black),
+                  const SizedBox(height: 4),
+                  Text('Student Signature', style: TextStyle(fontSize: 10, color: Colors.grey.shade700)),
+                ]),
+                Column(children: [
+                  Container(width: 130, height: 1, color: Colors.black),
+                  const SizedBox(height: 4),
+                  Text('Advisor Signature (${form.advisorName})', style: TextStyle(fontSize: 10, color: Colors.grey.shade700)),
+                ]),
+                Column(children: [
+                  Container(width: 130, height: 1, color: Colors.black),
+                  const SizedBox(height: 4),
+                  Text('Principal / Controller of Examinations', style: TextStyle(fontSize: 10, color: Colors.grey.shade700)),
+                ]),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Divider(color: Colors.grey.shade300),
+            Text(
+              'Generated via Smart ERP \u2022 ${DateFormat('dd MMM yyyy').format(DateTime.now())}',
+              style: TextStyle(fontSize: 9, color: Colors.grey.shade600),
+            ),
+          ],
         ),
       );
-      final bytes = await doc.save();
-      await Printing.layoutPdf(onLayout: (_) async => bytes);
+
+      if (!mounted) return;
+      await openCertificatePreview(
+        context,
+        title: 'Examination Form',
+        fileName: 'ExamForm_${form.rollNo.isNotEmpty ? form.rollNo : form.id}',
+        certificate: reportWidget,
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -978,7 +873,7 @@ class _FormStatusCardState extends State<_FormStatusCard> {
         );
       }
     } finally {
-      if (mounted) setState(() => _printing = false);
+      if (mounted) setState(() => _generating = false);
     }
   }
 
@@ -1130,7 +1025,7 @@ class _FormStatusCardState extends State<_FormStatusCard> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  icon: _printing
+                  icon: _generating
                       ? const SizedBox(
                           width: 16,
                           height: 16,
@@ -1139,11 +1034,11 @@ class _FormStatusCardState extends State<_FormStatusCard> {
                             color: Colors.white,
                           ),
                         )
-                      : const Icon(Icons.print, size: 16),
+                      : const Icon(Icons.image_outlined, size: 16),
                   label: Text(
-                    _printing ? 'Preparing PDF...' : 'Print / Download Form',
+                    _generating ? 'Generating...' : 'Generate Form Image',
                   ),
-                  onPressed: _printing ? null : _printForm,
+                  onPressed: _generating ? null : _generateForm,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.success,
                     padding: const EdgeInsets.symmetric(vertical: 10),

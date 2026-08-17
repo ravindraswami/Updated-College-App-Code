@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:smart_exam/screens/student/bonafide_apply_screen.dart';
 import 'package:smart_exam/screens/student/character_cert_screen.dart';
-import 'package:smart_exam/screens/student/exam_form_apply_screen.dart';
+import 'package:smart_exam/screens/student/registration_form_screen.dart';
 import 'package:smart_exam/screens/student/exam_list_screen.dart';
 import 'package:smart_exam/screens/student/my_results_screen.dart';
 import 'package:smart_exam/screens/student/scholarship_apply_screen.dart';
@@ -68,7 +68,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
       selectedIcon: Icons.workspace_premium,
     ),
     DrawerItem(
-      label: 'Exam Form',
+      label: 'Registration Form',
       icon: Icons.edit_document,
       selectedIcon: Icons.edit_document,
     ),
@@ -156,7 +156,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
       case 5:
         return CharacterCertScreen(student: _user!);
       case 6:
-        return ExamFormApplyScreen(student: _user!);
+        return RegistrationFormScreen(student: _user!);
       case 7:
         return ScholarshipApplyScreen(student: _user!);
       default:
@@ -468,7 +468,7 @@ class _StudentHome extends StatelessWidget {
               Expanded(
                 child: _SectionCard(
                   index: 6,
-                  label: 'Exam Form',
+                  label: 'Registration Form',
                   icon: Icons.edit_document,
                   color: const Color(0xFF0F766E),
                   onTap: onSectionTap,
@@ -564,6 +564,7 @@ class _MyAdvisorCardState extends State<_MyAdvisorCard> {
         u.branch,
         u.year,
         regNo,
+        semester: u.semester,
       );
       String mobile = '';
       if (assignment != null && assignment.advisorId.isNotEmpty) {

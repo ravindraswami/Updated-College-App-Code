@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:printing/printing.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import '../../models/user_model.dart';
 import '../../models/scholarship_model.dart';
 import '../../services/scholarship_service.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/certificate_widgets.dart' as certw;
+import '../shared/certificate_preview_screen.dart';
 
 class ScholarshipApplyScreen extends StatefulWidget {
   final UserModel student;
@@ -134,137 +133,85 @@ class _ScholarshipCard extends StatefulWidget {
 
 class _ScholarshipCardState extends State<_ScholarshipCard> {
   ScholarshipModel get req => widget.req;
-  bool _printing = false;
+  bool _generating = false;
 
-  Future<void> _printApproval() async {
-    setState(() => _printing = true);
+  Future<void> _generateApproval() async {
+    setState(() => _generating = true);
     try {
-      final doc = pw.Document();
-      doc.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(36),
-          build: (ctx) => pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.center,
-            children: [
-              pw.Text(
-                'SCHOLARSHIP APPROVAL LETTER',
-                style: pw.TextStyle(
-                  fontSize: 16,
-                  fontWeight: pw.FontWeight.bold,
-                  letterSpacing: 1.5,
-                ),
-              ),
-              pw.SizedBox(height: 4),
-              pw.Container(width: 80, height: 2, color: PdfColors.green800),
-              pw.SizedBox(height: 16),
-              pw.Table(
-                border: pw.TableBorder.all(
-                  color: PdfColors.grey400,
-                  width: 0.5,
-                ),
-                columnWidths: {
-                  0: const pw.FixedColumnWidth(160),
-                  1: const pw.FlexColumnWidth(),
-                },
-                children:
-                    [
-                      ['ERP / Roll No.', req.erpId],
-                      ['Scholarship Type', req.scholarshipType],
-                      ['Religion / Caste', '${req.religion} / ${req.caste}'],
-                      ['Caste Category', req.casteCategory],
-                      [
-                        'Income (Annual)',
-                        ((req as dynamic).annualIncome ?? '').toString(),
-                      ],
-                      [
-                        'Form Filled',
-                        req.formFilledStatus == 'yes' ? 'Yes' : 'No',
-                      ],
-                      ['Application Status', 'APPROVED ✓'],
-                      ['Academic Year', req.year],
-                    ].map((row) {
-                      return pw.TableRow(
-                        children: [
-                          pw.Padding(
-                            padding: const pw.EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 5,
-                            ),
-                            child: pw.Text(
-                              row[0],
-                              style: pw.TextStyle(
-                                fontWeight: pw.FontWeight.bold,
-                                fontSize: 10,
-                              ),
-                            ),
-                          ),
-                          pw.Padding(
-                            padding: const pw.EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 5,
-                            ),
-                            child: pw.Text(
-                              row[1].isNotEmpty ? row[1] : '—',
-                              style: const pw.TextStyle(fontSize: 10),
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList(),
-              ),
-              pw.SizedBox(height: 40),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Column(
-                    children: [
-                      pw.Container(
-                        width: 100,
-                        height: 1,
-                        color: PdfColors.black,
-                      ),
-                      pw.SizedBox(height: 4),
-                      pw.Text(
-                        'Student Signature',
-                        style: const pw.TextStyle(
-                          fontSize: 9,
-                          color: PdfColors.grey,
+      final rows = [
+        ['ERP / Roll No.', req.erpId],
+        ['Scholarship Type', req.scholarshipType],
+        ['Religion / Caste', '${req.religion} / ${req.caste}'],
+        ['Caste Category', req.casteCategory],
+        ['Income (Annual)', ((req as dynamic).annualIncome ?? '').toString()],
+        ['Form Filled', req.formFilledStatus == 'yes' ? 'Yes' : 'No'],
+        ['Application Status', 'APPROVED \u2713'],
+        ['Academic Year', req.year],
+      ];
+
+      final letterWidget = certw.reportSheet(
+        width: 850,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            certw.buildLetterheadBlock(),
+            const SizedBox(height: 10),
+            const Text(
+              'SCHOLARSHIP APPROVAL LETTER',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+            ),
+            const SizedBox(height: 6),
+            Container(width: 90, height: 2, color: Colors.green.shade800),
+            const SizedBox(height: 18),
+            Table(
+              border: TableBorder.all(color: Colors.grey.shade400, width: 0.6),
+              columnWidths: const {0: FixedColumnWidth(170), 1: FlexColumnWidth()},
+              children: rows
+                  .map((row) => TableRow(children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          child: Text(row[0], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                         ),
-                      ),
-                    ],
-                  ),
-                  pw.Column(
-                    children: [
-                      pw.Container(
-                        width: 130,
-                        height: 1,
-                        color: PdfColors.black,
-                      ),
-                      pw.SizedBox(height: 4),
-                      pw.Text(
-                        'Principal / Authorized Signatory',
-                        style: const pw.TextStyle(
-                          fontSize: 9,
-                          color: PdfColors.grey,
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          child: Text(row[1].isNotEmpty ? row[1] : '\u2014', style: const TextStyle(fontSize: 11)),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 20),
-              pw.Divider(color: PdfColors.grey300),
-              pw.Text(
-                'Generated via Smart ERP • ${DateFormat('dd MMM yyyy').format(DateTime.now())}',
-                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey),
-              ),
-            ],
-          ),
+                      ]))
+                  .toList(),
+            ),
+            const SizedBox(height: 44),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(children: [
+                  Container(width: 100, height: 1, color: Colors.black),
+                  const SizedBox(height: 4),
+                  Text('Student Signature', style: TextStyle(fontSize: 10, color: Colors.grey.shade700)),
+                ]),
+                Column(children: [
+                  Container(width: 130, height: 1, color: Colors.black),
+                  const SizedBox(height: 4),
+                  Text('Principal / Authorized Signatory', style: TextStyle(fontSize: 10, color: Colors.grey.shade700)),
+                ]),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Divider(color: Colors.grey.shade300),
+            Text(
+              'Generated via Smart ERP \u2022 ${DateFormat('dd MMM yyyy').format(DateTime.now())}',
+              style: TextStyle(fontSize: 9, color: Colors.grey.shade600),
+            ),
+          ],
         ),
       );
-      final bytes = await doc.save();
-      await Printing.layoutPdf(onLayout: (_) async => bytes);
+
+      if (!mounted) return;
+      await openCertificatePreview(
+        context,
+        title: 'Scholarship Approval Letter',
+        fileName: 'ScholarshipApproval_${req.erpId}',
+        certificate: letterWidget,
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -272,7 +219,7 @@ class _ScholarshipCardState extends State<_ScholarshipCard> {
         );
       }
     } finally {
-      if (mounted) setState(() => _printing = false);
+      if (mounted) setState(() => _generating = false);
     }
   }
 
@@ -391,7 +338,7 @@ class _ScholarshipCardState extends State<_ScholarshipCard> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  icon: _printing
+                  icon: _generating
                       ? const SizedBox(
                           width: 16,
                           height: 16,
@@ -400,13 +347,13 @@ class _ScholarshipCardState extends State<_ScholarshipCard> {
                             color: Colors.white,
                           ),
                         )
-                      : const Icon(Icons.print, size: 16),
+                      : const Icon(Icons.image_outlined, size: 16),
                   label: Text(
-                    _printing
-                        ? 'Preparing PDF...'
-                        : 'Print / Download Approval Letter',
+                    _generating
+                        ? 'Generating...'
+                        : 'Generate Approval Letter Image',
                   ),
-                  onPressed: _printing ? null : _printApproval,
+                  onPressed: _generating ? null : _generateApproval,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.success,
                     padding: const EdgeInsets.symmetric(vertical: 10),
