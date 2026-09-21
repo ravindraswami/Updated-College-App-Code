@@ -288,9 +288,16 @@ Widget _frame({required Widget child}) => Container(
 // ══════════════════════════════════════════════════════════════
 // 1. BONAFIDE CERTIFICATE
 // ══════════════════════════════════════════════════════════════
-Widget buildBonafideCertificate(BonafideModel b) {
+
+/// Fallback "YYYY-YY" academic year string, used only when a request was
+/// created before the academicYear field existed (Req #5).
+String _fallbackAcademicYear() {
   final today = DateTime.now();
-  final acYear = '${today.year - 1}-${(today.year % 100).toString().padLeft(2, '0')}';
+  return '${today.year - 1}-${(today.year % 100).toString().padLeft(2, '0')}';
+}
+
+Widget buildBonafideCertificate(BonafideModel b) {
+  final acYear = b.academicYear.isNotEmpty ? b.academicYear : _fallbackAcademicYear();
 
   return _frame(
     child: Column(
@@ -337,8 +344,7 @@ Widget buildBonafideCertificate(BonafideModel b) {
 // 2. CHARACTER CERTIFICATE
 // ══════════════════════════════════════════════════════════════
 Widget buildCharacterCertCertificate(CharacterCertModel c) {
-  final today = DateTime.now();
-  final acYear = '${today.year - 1}-${(today.year % 100).toString().padLeft(2, '0')}';
+  final acYear = c.academicYear.isNotEmpty ? c.academicYear : _fallbackAcademicYear();
 
   return _frame(
     child: Column(

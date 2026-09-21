@@ -16,7 +16,7 @@ import '../../widgets/common_widgets.dart';
 import '../auth/login_screen.dart';
 import '../profile/profile_screen.dart';
 import 'registration_education_screen.dart';
-import '../principal/monthly_report_screen.dart';
+import '../dean/monthly_report_screen.dart';
 import 'fee_settings_screen.dart';
 import 'tc_edit_screen.dart';
 import '../../utils/certificate_widgets.dart' as cert;
@@ -24,13 +24,13 @@ import '../shared/certificate_preview_screen.dart';
 import 'bonafide_edit_screen.dart';
 import 'character_cert_edit_screen.dart';
 
-class TechnicalDashboard extends StatefulWidget {
-  const TechnicalDashboard({super.key});
+class EducationDashboard extends StatefulWidget {
+  const EducationDashboard({super.key});
   @override
-  State<TechnicalDashboard> createState() => _TechnicalDashboardState();
+  State<EducationDashboard> createState() => _EducationDashboardState();
 }
 
-class _TechnicalDashboardState extends State<TechnicalDashboard> {
+class _EducationDashboardState extends State<EducationDashboard> {
   final _auth = AuthService();
   final _scholarshipSvc = ScholarshipService();
   final _bonafideSvc = BonafideService();
@@ -384,7 +384,7 @@ class _TechHomeTab extends StatelessWidget {
 
 // Helper: navigate to a tab from any child widget
 void _goToTab(BuildContext context, int index) {
-  final state = context.findAncestorStateOfType<_TechnicalDashboardState>();
+  final state = context.findAncestorStateOfType<_EducationDashboardState>();
   state?.setState(() => state._drawerIndex = index);
 }
 

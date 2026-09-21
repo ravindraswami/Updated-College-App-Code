@@ -9,19 +9,19 @@ import '../../utils/constants.dart';
 import '../../utils/academic_data.dart';
 import '../../widgets/common_widgets.dart';
 import '../notes/upload_note_screen.dart';
-import '../professor/subject_management_screen.dart';
-import 'hod_assignment_screen.dart';
+import '../course_teacher/subject_management_screen.dart';
+import 'incharge_assignment_screen.dart';
 import '../auth/login_screen.dart';
 import '../profile/profile_screen.dart';
 import 'student_profile_edit_screen.dart';
 
-class HodDashboard extends StatefulWidget {
-  const HodDashboard({super.key});
+class InchargeDashboard extends StatefulWidget {
+  const InchargeDashboard({super.key});
   @override
-  State<HodDashboard> createState() => _HodDashboardState();
+  State<InchargeDashboard> createState() => _InchargeDashboardState();
 }
 
-class _HodDashboardState extends State<HodDashboard> {
+class _InchargeDashboardState extends State<InchargeDashboard> {
   final _auth = AuthService();
   final _svc = UserService();
   UserModel? _user;
@@ -164,7 +164,11 @@ class _HomeTab extends StatelessWidget {
   final UserModel? user;
   final UserService svc;
   final String scopeBranch;
-  const _HomeTab({required this.user, required this.svc, this.scopeBranch = ''});
+  const _HomeTab({
+    required this.user,
+    required this.svc,
+    this.scopeBranch = '',
+  });
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -185,7 +189,9 @@ class _HomeTab extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  user == null ? 'Incharge' : AppConstants.roleLabel(user!.role),
+                  user == null
+                      ? 'Incharge'
+                      : AppConstants.roleLabel(user!.role),
                   style: const TextStyle(color: Colors.white70, fontSize: 13),
                 ),
                 Text(
@@ -210,11 +216,15 @@ class _HomeTab extends StatelessWidget {
             builder: (_, snap) {
               final users = snap.data ?? [];
               final students = users
-                  .where((u) =>
-                      u.role == 'student' &&
-                      (scopeBranch.isEmpty || u.branch == scopeBranch))
+                  .where(
+                    (u) =>
+                        u.role == 'student' &&
+                        (scopeBranch.isEmpty || u.branch == scopeBranch),
+                  )
                   .length;
-              final coords = users.where((u) => u.role == 'coordinator').length;
+              final coords = users
+                  .where((u) => u.role == 'coordinator' || u.role == 'advisor')
+                  .length;
               final pending = users
                   .where((u) => !u.isApproved && u.role != 'student')
                   .length;
@@ -371,7 +381,10 @@ class _StudentsTab extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     IconButton(
-                      icon: const Icon(Icons.edit_outlined, color: AppTheme.primary),
+                      icon: const Icon(
+                        Icons.edit_outlined,
+                        color: AppTheme.primary,
+                      ),
                       tooltip: 'View / Edit Profile',
                       onPressed: () => Navigator.push(
                         context,
@@ -436,7 +449,10 @@ class _SubjectsTabState extends State<_SubjectsTab>
             labelColor: AppTheme.success,
             unselectedLabelColor: Colors.grey,
             indicatorColor: AppTheme.success,
-            labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            labelStyle: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
             tabs: const [
               Tab(text: 'Manage Subjects'),
               Tab(text: 'Assign Advisor / Teacher'),
@@ -452,7 +468,7 @@ class _SubjectsTabState extends State<_SubjectsTab>
                 canAdd: true,
                 fixedBranch: widget.scopeBranch,
               ),
-              HodAssignmentBody(
+              InchargeAssignmentBody(
                 hod: widget.hod,
                 fixedBranch: widget.scopeBranch,
               ),
@@ -471,7 +487,7 @@ class _ClassManagementTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder(
-      stream: svc.getUsersByRole('coordinator'),
+      stream: svc.getUsersByRole('advisor', legacyRole: 'coordinator'),
       builder: (_, snap) {
         if (!snap.hasData) return const LoadingWidget();
         final coords = snap.data!.where((c) => c.isApproved).toList();
@@ -940,7 +956,12 @@ class _ApprovalsTab extends StatelessWidget {
             .where(
               (u) =>
                   !u.isApproved &&
-                  ['professor', 'coordinator'].contains(u.role),
+                  [
+                    'professor',
+                    'coordinator',
+                    'course_teacher',
+                    'advisor',
+                  ].contains(u.role),
             )
             .toList();
         if (pending.isEmpty)

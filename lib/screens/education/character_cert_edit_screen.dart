@@ -1,23 +1,24 @@
 import 'package:flutter/material.dart';
-import '../../models/bonafide_model.dart';
-import '../../services/bonafide_service.dart';
+import '../../models/character_cert_model.dart';
+import '../../services/character_cert_service.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/academic_data.dart';
 import '../../utils/certificate_widgets.dart' as cert;
 import '../shared/certificate_preview_screen.dart';
 
-/// Education Section: full edit form for a Bonafide Certificate request.
+/// Education Section: full edit form for a Character Certificate request.
 /// Every field can be corrected here before the certificate image is
-/// generated — mirrors TcEditScreen / CharacterCertEditScreen.
-class BonafideEditScreen extends StatefulWidget {
-  final BonafideModel bonafide;
-  const BonafideEditScreen({super.key, required this.bonafide});
+/// generated — mirrors TcEditScreen / BonafideEditScreen.
+class CharacterCertEditScreen extends StatefulWidget {
+  final CharacterCertModel cert;
+  const CharacterCertEditScreen({super.key, required this.cert});
 
   @override
-  State<BonafideEditScreen> createState() => _BonafideEditScreenState();
+  State<CharacterCertEditScreen> createState() => _CharacterCertEditScreenState();
 }
 
-class _BonafideEditScreenState extends State<BonafideEditScreen> {
-  final _svc = BonafideService();
+class _CharacterCertEditScreenState extends State<CharacterCertEditScreen> {
+  final _svc = CharacterCertService();
   final _formKey = GlobalKey<FormState>();
   bool _saving = false;
   late final Map<String, TextEditingController> _c;
@@ -25,15 +26,22 @@ class _BonafideEditScreenState extends State<BonafideEditScreen> {
   @override
   void initState() {
     super.initState();
-    final b = widget.bonafide;
+    final c = widget.cert;
     _c = {
-      'studentName': TextEditingController(text: b.studentName),
-      'erpId': TextEditingController(text: b.erpId),
-      'branch': TextEditingController(text: b.branch),
-      'year': TextEditingController(text: b.year),
-      'semester': TextEditingController(text: b.semester),
-      'rollNo': TextEditingController(text: b.rollNo),
-      'purpose': TextEditingController(text: b.purpose),
+      'studentName': TextEditingController(text: c.studentName),
+      'erpId': TextEditingController(text: c.erpId),
+      'branch': TextEditingController(text: c.branch),
+      'year': TextEditingController(text: c.year),
+      'semester': TextEditingController(text: c.semester),
+      'rollNo': TextEditingController(text: c.rollNo),
+      'dob': TextEditingController(text: c.dob),
+      'conductRemark': TextEditingController(text: c.conductRemark),
+      'purpose': TextEditingController(text: c.purpose),
+      'academicYear': TextEditingController(
+        text: c.academicYear.isNotEmpty
+            ? c.academicYear
+            : AcademicData.defaultAcademicYearFor(admissionDate: '', yearId: c.year),
+      ),
     };
   }
 
@@ -45,29 +53,28 @@ class _BonafideEditScreenState extends State<BonafideEditScreen> {
     super.dispose();
   }
 
-  BonafideModel _buildUpdatedModel() {
-    final b = widget.bonafide;
-    return BonafideModel(
-      id: b.id,
-      studentId: b.studentId,
+  CharacterCertModel _buildUpdatedModel() {
+    final c = widget.cert;
+    return CharacterCertModel(
+      id: c.id,
+      studentId: c.studentId,
       studentName: _c['studentName']!.text.trim(),
       erpId: _c['erpId']!.text.trim(),
       branch: _c['branch']!.text.trim(),
       year: _c['year']!.text.trim(),
       semester: _c['semester']!.text.trim(),
       rollNo: _c['rollNo']!.text.trim(),
+      dob: _c['dob']!.text.trim(),
+      conductRemark: _c['conductRemark']!.text.trim(),
       purpose: _c['purpose']!.text.trim(),
-      applyDate: b.applyDate,
-      status: b.status,
-      isPaid: b.isPaid,
-      paymentId: b.paymentId,
-      paymentDate: b.paymentDate,
-      paymentScreenshotUrl: b.paymentScreenshotUrl,
-      charges: b.charges,
-      approvedBy: b.approvedBy,
-      approvedDate: b.approvedDate,
-      pdfUrl: b.pdfUrl,
-      createdAt: b.createdAt,
+      status: c.status,
+      isPaid: c.isPaid,
+      charges: c.charges,
+      paymentId: c.paymentId,
+      approvedBy: c.approvedBy,
+      approvedDate: c.approvedDate,
+      createdAt: c.createdAt,
+      academicYear: _c['academicYear']!.text.trim(),
     );
   }
 
@@ -76,20 +83,20 @@ class _BonafideEditScreenState extends State<BonafideEditScreen> {
     setState(() => _saving = true);
     try {
       final updated = _buildUpdatedModel();
-      await _svc.updateBonafide(updated);
+      await _svc.updateCert(updated);
       if (!mounted) return;
       if (andGenerate) {
         await openCertificatePreview(
           context,
-          title: 'Bonafide Certificate',
-          fileName: 'Bonafide_${updated.studentName.replaceAll(' ', '_')}',
-          certificate: cert.buildBonafideCertificate(updated),
+          title: 'Character Certificate',
+          fileName: 'CharacterCert_${updated.studentName.replaceAll(' ', '_')}',
+          certificate: cert.buildCharacterCertCertificate(updated),
         );
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(andGenerate ? 'Saved and certificate generated.' : 'Bonafide details saved.'),
+          content: Text(andGenerate ? 'Saved and certificate generated.' : 'Character certificate details saved.'),
           backgroundColor: AppTheme.success,
         ),
       );
@@ -125,8 +132,8 @@ class _BonafideEditScreenState extends State<BonafideEditScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Edit Bonafide Certificate'),
-        backgroundColor: const Color(0xFF7C3AED),
+        title: const Text('Edit Character Certificate'),
+        backgroundColor: const Color(0xFFB45309),
       ),
       body: Form(
         key: _formKey,
@@ -144,7 +151,10 @@ class _BonafideEditScreenState extends State<BonafideEditScreen> {
               _field('branch', 'Branch'),
               _field('year', 'Year'),
               _field('semester', 'Semester'),
+              _field('dob', 'Date of Birth'),
+              _field('conductRemark', 'Conduct Remark'),
               _field('purpose', 'Purpose', maxLines: 2),
+              _field('academicYear', 'Academic Year (During the Year) — e.g. 2024-25'),
               const SizedBox(height: 20),
               Row(
                 children: [

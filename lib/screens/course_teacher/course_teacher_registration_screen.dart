@@ -177,6 +177,56 @@ class _StudentRow extends StatelessWidget {
     }
   }
 
+  Future<void> _reject(BuildContext context) async {
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Reject Registration Form'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Rejecting the whole registration form for ${row.form.name}. '
+              'They will need to pay the fee and fill the form again.',
+              style: const TextStyle(color: Colors.grey, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Reason for rejection',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Reject'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final reason = ctrl.text.trim().isNotEmpty
+        ? ctrl.text.trim()
+        : 'Rejected by Course Teacher';
+    await ExamFormService().teacherRejectForm(row.form.id, teacherName, reason);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Rejected ${row.form.name}\'s registration form.'), backgroundColor: AppTheme.error),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final f = row.form;
@@ -197,6 +247,12 @@ class _StudentRow extends StatelessWidget {
               ],
             ),
           ),
+          IconButton(
+            icon: const Icon(Icons.close, color: AppTheme.error, size: 20),
+            tooltip: 'Reject Form',
+            onPressed: () => _reject(context),
+          ),
+          const SizedBox(width: 4),
           PopupMenuButton<String>(
             onSelected: (v) => _sign(context, v),
             itemBuilder: (_) => const [

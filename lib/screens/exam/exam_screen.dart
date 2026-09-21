@@ -257,31 +257,50 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _submitWithZeroScore() async {
-    final user = await _authService.getCurrentUserModel();
-    if (user == null || !mounted) return;
+    try {
+      final user = await _authService
+          .getCurrentUserModel()
+          .timeout(const Duration(seconds: 20));
+      if (user == null) {
+        throw Exception('Could not verify your account.');
+      }
+      if (!mounted) return;
 
-    // Save result with 0 score
-    final result = ResultModel(
-      id: '',
-      studentId: user.id,
-      examId: widget.exam.id,
-      answers: const {}, // no answers recorded
-      score: 0,
-      percentage: 0.0,
-      totalQuestions: _questions.length,
-      timestamp: DateTime.now(),
-    );
+      // Save result with 0 score
+      final result = ResultModel(
+        id: '',
+        studentId: user.id,
+        examId: widget.exam.id,
+        answers: const {}, // no answers recorded
+        score: 0,
+        percentage: 0.0,
+        totalQuestions: _questions.length,
+        timestamp: DateTime.now(),
+      );
 
-    await _examService.saveResult(result);
-    await _clearProgress();
+      await _examService.saveResult(result).timeout(const Duration(seconds: 20));
+      await _clearProgress();
 
-    if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ResultScreen(result: result, exam: widget.exam),
-      ),
-    );
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ResultScreen(result: result, exam: widget.exam),
+        ),
+      );
+    } catch (e) {
+      // Same "don't leave the screen stuck" fix as _submitExam — if this
+      // fails, let the student retry instead of being stuck forever.
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not submit: ${e.toString().replaceFirst('Exception: ', '')}. Please try again.'),
+          backgroundColor: AppTheme.error,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
   }
 
   // ── PopScope — intercept back button during exam ──────────
@@ -419,42 +438,64 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
     setState(() => _isSubmitting = true);
     _timer?.cancel();
 
-    final user = await _authService.getCurrentUserModel();
-    if (user == null || !mounted) return;
-
-    int correct = 0;
-    final answersMap = <String, int>{};
-    for (int i = 0; i < _questions.length; i++) {
-      if (_answers.containsKey(i)) {
-        answersMap[_questions[i].id] = _answers[i]!;
-        if (_answers[i] == _questions[i].correctAnswerIndex) correct++;
+    try {
+      final user = await _authService
+          .getCurrentUserModel()
+          .timeout(const Duration(seconds: 20));
+      if (user == null) {
+        throw Exception('Could not verify your account. Please check your internet connection.');
       }
+      if (!mounted) return;
+
+      int correct = 0;
+      final answersMap = <String, int>{};
+      for (int i = 0; i < _questions.length; i++) {
+        if (_answers.containsKey(i)) {
+          answersMap[_questions[i].id] = _answers[i]!;
+          if (_answers[i] == _questions[i].correctAnswerIndex) correct++;
+        }
+      }
+
+      final percentage = _questions.isEmpty
+          ? 0.0
+          : (correct / _questions.length) * 100;
+      final result = ResultModel(
+        id: '',
+        studentId: user.id,
+        examId: widget.exam.id,
+        answers: answersMap,
+        score: correct,
+        percentage: percentage,
+        totalQuestions: _questions.length,
+        timestamp: DateTime.now(),
+      );
+
+      await _examService.saveResult(result).timeout(const Duration(seconds: 20));
+      await _clearProgress();
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ResultScreen(result: result, exam: widget.exam),
+        ),
+      );
+    } catch (e) {
+      // IMPORTANT: without this catch, any network hiccup here left
+      // _isSubmitting stuck at true forever — the Submit button stays
+      // disabled with no explanation, which is exactly the "screen
+      // freezes" symptom. Now the student sees why it failed and can
+      // just tap Submit again.
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not submit: ${e.toString().replaceFirst('Exception: ', '')}. Please try again.'),
+          backgroundColor: AppTheme.error,
+          duration: const Duration(seconds: 5),
+        ),
+      );
     }
-
-    final percentage = _questions.isEmpty
-        ? 0.0
-        : (correct / _questions.length) * 100;
-    final result = ResultModel(
-      id: '',
-      studentId: user.id,
-      examId: widget.exam.id,
-      answers: answersMap,
-      score: correct,
-      percentage: percentage,
-      totalQuestions: _questions.length,
-      timestamp: DateTime.now(),
-    );
-
-    await _examService.saveResult(result);
-    await _clearProgress();
-
-    if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ResultScreen(result: result, exam: widget.exam),
-      ),
-    );
   }
 
   Future<void> _clearProgress() async {
@@ -638,10 +679,12 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-              Text(
-                widget.exam.title,
-                style: const TextStyle(fontSize: 16),
-                overflow: TextOverflow.ellipsis,
+              Expanded(
+                child: Text(
+                  widget.exam.title,
+                  style: const TextStyle(fontSize: 16),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
@@ -889,37 +932,56 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
               ),
               child: Row(
                 children: [
-                  if (_currentIndex > 0)
-                    OutlinedButton.icon(
-                      onPressed: () => setState(() => _currentIndex--),
-                      icon: const Icon(Icons.arrow_back),
-                      label: const Text('Prev'),
-                    ),
-                  const Spacer(),
-                  ElevatedButton.icon(
-                    onPressed: _showPalette,
-                    icon: const Icon(Icons.grid_view, size: 18),
-                    label: const Text('Palette'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.secondary,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (_currentIndex < _questions.length - 1)
-                    ElevatedButton.icon(
-                      onPressed: () => setState(() => _currentIndex++),
-                      icon: const Icon(Icons.arrow_forward),
-                      label: const Text('Next'),
-                    )
-                  else
-                    ElevatedButton.icon(
-                      onPressed: _isSubmitting ? null : _submitExam,
-                      icon: const Icon(Icons.send),
-                      label: const Text('Submit'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.success,
+                  if (_currentIndex > 0) ...[
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => setState(() => _currentIndex--),
+                        icon: const Icon(Icons.arrow_back, size: 18),
+                        label: const Text(
+                          'Prev',
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _showPalette,
+                      icon: const Icon(Icons.grid_view, size: 18),
+                      label: const Text(
+                        'Palette',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.secondary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _currentIndex < _questions.length - 1
+                        ? ElevatedButton.icon(
+                            onPressed: () =>
+                                setState(() => _currentIndex++),
+                            icon: const Icon(Icons.arrow_forward, size: 18),
+                            label: const Text(
+                              'Next',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          )
+                        : ElevatedButton.icon(
+                            onPressed: _isSubmitting ? null : _submitExam,
+                            icon: const Icon(Icons.send, size: 18),
+                            label: const Text(
+                              'Submit',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.success,
+                            ),
+                          ),
+                  ),
                 ],
               ),
             ),

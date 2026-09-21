@@ -315,22 +315,25 @@ class _ExamCardState extends State<_ExamCard> {
             const SizedBox(height: 12),
 
             // Info chips
-            Row(
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
               children: [
                 _info(
                   Icons.calendar_today,
                   DateFormat('dd MMM yyyy').format(widget.exam.examDate),
                 ),
-                const SizedBox(width: 12),
                 _info(Icons.timer, '${widget.exam.durationMinutes} min'),
-                const SizedBox(width: 12),
                 _info(Icons.quiz, '${widget.exam.totalQuestions} Qs'),
               ],
             ),
             const Divider(height: 20),
 
             // Price + Action button row
-            Row(
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              runSpacing: 8,
               children: [
                 Text(
                   '₹${widget.exam.price.toStringAsFixed(2)}',
@@ -340,7 +343,6 @@ class _ExamCardState extends State<_ExamCard> {
                     color: AppTheme.primary,
                   ),
                 ),
-                const Spacer(),
                 _buildActionButton(),
               ],
             ),

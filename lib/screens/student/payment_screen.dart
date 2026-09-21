@@ -339,10 +339,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
                             color: AppTheme.primary,
                           ),
                         ),
-                        const Spacer(),
-                        Text(
-                          'For: $_title',
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'For: $_title',
+                            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.end,
+                          ),
                         ),
                       ],
                     ),

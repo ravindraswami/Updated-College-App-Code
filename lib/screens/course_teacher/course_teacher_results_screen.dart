@@ -8,9 +8,9 @@ import '../../models/user_model.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 
-class ProfessorResultsScreen extends StatelessWidget {
+class CourseTeacherResultsScreen extends StatelessWidget {
   final String professorId;
-  const ProfessorResultsScreen({super.key, required this.professorId});
+  const CourseTeacherResultsScreen({super.key, required this.professorId});
 
   @override
   Widget build(BuildContext context) {

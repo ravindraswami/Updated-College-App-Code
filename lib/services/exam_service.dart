@@ -110,6 +110,8 @@ class ExamService {
     required String studentId,
     required String examId,
     required bool isPaid,
+    String paymentId = '',
+    String paymentDate = '',
   }) async {
     final existing = await _db
         .collection('enrollments')
@@ -117,12 +119,18 @@ class ExamService {
         .where('examId', isEqualTo: examId)
         .get();
     if (existing.docs.isNotEmpty) {
-      await existing.docs.first.reference.update({'isPaid': isPaid});
+      await existing.docs.first.reference.update({
+        'isPaid': isPaid,
+        if (paymentId.isNotEmpty) 'paymentId': paymentId,
+        if (paymentDate.isNotEmpty) 'paymentDate': paymentDate,
+      });
     } else {
       await _db.collection('enrollments').add({
         'studentId': studentId,
         'examId': examId,
         'isPaid': isPaid,
+        'paymentId': paymentId,
+        'paymentDate': paymentDate,
         'timestamp': FieldValue.serverTimestamp(),
       });
     }

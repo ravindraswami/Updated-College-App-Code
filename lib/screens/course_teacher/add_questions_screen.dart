@@ -922,7 +922,10 @@ class _BulkImportTabState extends State<_BulkImportTab> {
           // Preview list
           if (_parsed.isNotEmpty) ...[
             const SizedBox(height: 20),
-            Row(
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              runSpacing: 4,
               children: [
                 Text(
                   '${_parsed.length} Questions Found',
@@ -931,18 +934,21 @@ class _BulkImportTabState extends State<_BulkImportTab> {
                     fontSize: 16,
                   ),
                 ),
-                const Spacer(),
-                TextButton(
-                  onPressed: () => setState(() {
-                    for (final q in _parsed) q.selected = true;
-                  }),
-                  child: const Text('Select All'),
-                ),
-                TextButton(
-                  onPressed: () => setState(() {
-                    for (final q in _parsed) q.selected = false;
-                  }),
-                  child: const Text('Deselect All'),
+                Wrap(
+                  children: [
+                    TextButton(
+                      onPressed: () => setState(() {
+                        for (final q in _parsed) q.selected = true;
+                      }),
+                      child: const Text('Select All'),
+                    ),
+                    TextButton(
+                      onPressed: () => setState(() {
+                        for (final q in _parsed) q.selected = false;
+                      }),
+                      child: const Text('Deselect All'),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -1230,23 +1236,33 @@ class _QuestionTileState extends State<_QuestionTile> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      OutlinedButton.icon(
-                        onPressed: _uploadingImg ? null : _addImage,
-                        icon: const Icon(Icons.swap_horiz, size: 16),
-                        label: const Text('Change Image'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.secondary,
-                          side: const BorderSide(color: AppTheme.secondary),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _uploadingImg ? null : _addImage,
+                          icon: const Icon(Icons.swap_horiz, size: 16),
+                          label: const Text(
+                            'Change Image',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.secondary,
+                            side: const BorderSide(color: AppTheme.secondary),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      OutlinedButton.icon(
-                        onPressed: _removeImage,
-                        icon: const Icon(Icons.delete_outline, size: 16),
-                        label: const Text('Remove'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.error,
-                          side: const BorderSide(color: AppTheme.error),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _removeImage,
+                          icon: const Icon(Icons.delete_outline, size: 16),
+                          label: const Text(
+                            'Remove',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.error,
+                            side: const BorderSide(color: AppTheme.error),
+                          ),
                         ),
                       ),
                     ],

@@ -372,6 +372,9 @@ class _RegistrationFormFillScreenState extends State<RegistrationFormFillScreen>
 
   List<SubjectModel> _regularSubjects = [];
   List<SubjectModel> _pastSubjects = [];
+  // Req #2: regular subjects are auto-loaded but the student can uncheck
+  // any subject they are not appearing for (e.g. exemption/backlog carry-over).
+  final Set<String> _selectedRegularIds = {};
   final Set<String> _selectedBacklogIds = {};
   final Map<String, String> _backlogChoice = {}; // subjectId -> OFE/RR
   String _advisorId = '';
@@ -406,6 +409,10 @@ class _RegistrationFormFillScreenState extends State<RegistrationFormFillScreen>
         _pastSubjects = past.where((sub) => sub.semester != s.semester).toList();
         _advisorId = advisor?.advisorId ?? '';
         _advisorName = advisor?.advisorName ?? '';
+        // Default: all auto-loaded subjects are checked; student can uncheck.
+        _selectedRegularIds
+          ..clear()
+          ..addAll(_regularSubjects.map((sub) => sub.id));
         for (final sub in _regularSubjects) {
           _teacherNameCtrls.putIfAbsent(
               sub.id, () => TextEditingController(text: sub.teacherName));
@@ -415,13 +422,23 @@ class _RegistrationFormFillScreenState extends State<RegistrationFormFillScreen>
     }
   }
 
-  double get _regularTotalCredits =>
-      _regularSubjects.fold(0.0, (a, b) => a + b.totalCredit);
+  double get _regularTotalCredits => _regularSubjects
+      .where((s) => _selectedRegularIds.contains(s.id))
+      .fold(0.0, (a, b) => a + b.totalCredit);
 
   double get _backlogTotalCredits => _selectedBacklogIds.fold(
       0.0, (a, id) => a + (_pastSubjects.firstWhere((s) => s.id == id).totalCredit));
 
   Future<void> _submit() async {
+    if (_selectedRegularIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select at least one regular subject.'),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+      return;
+    }
     if (_selectedBacklogIds.any((id) => (_backlogChoice[id] ?? '').isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -433,14 +450,16 @@ class _RegistrationFormFillScreenState extends State<RegistrationFormFillScreen>
     }
     setState(() => _submitting = true);
     try {
-      final subjectIds = _regularSubjects.map((s) => s.id).toList();
-      final subjects = _regularSubjects.map((s) => s.name).toList();
-      final subjectCodes = {for (final s in _regularSubjects) s.id: s.code};
-      final subjectTitles = {for (final s in _regularSubjects) s.id: s.name};
-      final subjectCredits = {for (final s in _regularSubjects) s.id: s.totalCredit};
-      final subjectTeacherIds = {for (final s in _regularSubjects) s.id: s.teacherId};
+      final regularList =
+          _regularSubjects.where((s) => _selectedRegularIds.contains(s.id)).toList();
+      final subjectIds = regularList.map((s) => s.id).toList();
+      final subjects = regularList.map((s) => s.name).toList();
+      final subjectCodes = {for (final s in regularList) s.id: s.code};
+      final subjectTitles = {for (final s in regularList) s.id: s.name};
+      final subjectCredits = {for (final s in regularList) s.id: s.totalCredit};
+      final subjectTeacherIds = {for (final s in regularList) s.id: s.teacherId};
       final subjectTeacherNames = {
-        for (final s in _regularSubjects)
+        for (final s in regularList)
           s.id: (_teacherNameCtrls[s.id]?.text.trim().isNotEmpty ?? false)
               ? _teacherNameCtrls[s.id]!.text.trim()
               : s.teacherName
@@ -529,9 +548,17 @@ class _RegistrationFormFillScreenState extends State<RegistrationFormFillScreen>
               children: [
                 _RegularTab(
                   subjects: _regularSubjects,
+                  selectedIds: _selectedRegularIds,
                   totalCredits: _regularTotalCredits,
                   advisorName: _advisorName,
                   teacherNameCtrls: _teacherNameCtrls,
+                  onToggle: (id, val) => setState(() {
+                    if (val) {
+                      _selectedRegularIds.add(id);
+                    } else {
+                      _selectedRegularIds.remove(id);
+                    }
+                  }),
                 ),
                 _BacklogTab(
                   subjects: _pastSubjects,
@@ -576,14 +603,18 @@ class _RegistrationFormFillScreenState extends State<RegistrationFormFillScreen>
 
 class _RegularTab extends StatelessWidget {
   final List<SubjectModel> subjects;
+  final Set<String> selectedIds;
   final double totalCredits;
   final String advisorName;
   final Map<String, TextEditingController> teacherNameCtrls;
+  final void Function(String id, bool val) onToggle;
   const _RegularTab({
     required this.subjects,
+    required this.selectedIds,
     required this.totalCredits,
     required this.advisorName,
     required this.teacherNameCtrls,
+    required this.onToggle,
   });
 
   @override
@@ -594,27 +625,31 @@ class _RegularTab extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'All subjects for your current semester (auto-loaded). '
-            'You can correct the Course Teacher name if it looks wrong.',
+            'All subjects for your current semester are auto-loaded and checked. '
+            'Uncheck any subject you are not appearing for, and correct the '
+            'Course Teacher name if it looks wrong.',
             style: TextStyle(fontSize: 12, color: Colors.grey),
           ),
           const SizedBox(height: 10),
           _SubjectTable(
             rows: subjects
                 .map((s) => _RowData(
+                      id: s.id,
                       code: s.code,
                       title: s.name,
                       theory: s.theoryCredit,
                       practical: s.practicalCredit,
                       credit: s.totalCredit,
                       teacherNameCtrl: teacherNameCtrls[s.id],
+                      selected: selectedIds.contains(s.id),
                     ))
                 .toList(),
             advisorName: advisorName,
+            onToggle: onToggle,
           ),
           const SizedBox(height: 10),
           Text(
-            'Total Subjects: ${subjects.length}      Total Credits: ${totalCredits.toStringAsFixed(1)}',
+            'Total Subjects: ${selectedIds.length}      Total Credits: ${totalCredits.toStringAsFixed(1)}',
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           ),
           const SizedBox(height: 20),
@@ -714,26 +749,35 @@ class _BacklogTab extends StatelessWidget {
 }
 
 class _RowData {
+  final String id;
   final String code;
   final String title;
   final double theory;
   final double practical;
   final double credit;
   final TextEditingController? teacherNameCtrl;
+  final bool selected;
   _RowData({
+    required this.id,
     required this.code,
     required this.title,
     required this.theory,
     required this.practical,
     required this.credit,
     this.teacherNameCtrl,
+    required this.selected,
   });
 }
 
 class _SubjectTable extends StatelessWidget {
   final List<_RowData> rows;
   final String advisorName;
-  const _SubjectTable({required this.rows, required this.advisorName});
+  final void Function(String id, bool val) onToggle;
+  const _SubjectTable({
+    required this.rows,
+    required this.advisorName,
+    required this.onToggle,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -746,6 +790,7 @@ class _SubjectTable extends StatelessWidget {
         dataRowMinHeight: 64,
         dataRowMaxHeight: 68,
         columns: const [
+          DataColumn(label: Text('Appear')),
           DataColumn(label: Text('Sr No')),
           DataColumn(label: Text('Course No')),
           DataColumn(label: Text('Course Title')),
@@ -759,6 +804,12 @@ class _SubjectTable extends StatelessWidget {
         rows: List.generate(rows.length, (i) {
           final r = rows[i];
           return DataRow(cells: [
+            DataCell(
+              Checkbox(
+                value: r.selected,
+                onChanged: (v) => onToggle(r.id, v ?? false),
+              ),
+            ),
             DataCell(Text('${i + 1}')),
             DataCell(Text(r.code)),
             DataCell(Text(r.title)),
@@ -769,6 +820,7 @@ class _SubjectTable extends StatelessWidget {
                 height: 40,
                 child: TextField(
                   controller: r.teacherNameCtrl,
+                  enabled: r.selected,
                   decoration: const InputDecoration(
                     isDense: true,
                     contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),

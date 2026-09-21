@@ -118,11 +118,11 @@ class ExamFormService {
     await _db.collection(_col).doc(formId).update({
       'status': 'rejected',
       'rejectReason': reason,
-      'rejectedBy': 'technical',
+      'rejectedBy': 'education',
     });
   }
 
-  // All approved forms (principal / hall tickets)
+  // All approved forms (dean / hall tickets)
   Stream<List<ExamFormModel>> getApprovedForms() {
     return _db
         .collection(_col)
@@ -303,6 +303,21 @@ class ExamFormService {
     }
   }
 
+  /// Course Teacher: rejects the whole registration form (e.g. wrong
+  /// subject selection, ineligible student). Student must start a fresh
+  /// registration (pay fee again & re-fill) — Req #4.
+  Future<void> teacherRejectForm(
+    String formId,
+    String teacherName,
+    String reason,
+  ) async {
+    await _db.collection(_col).doc(formId).update({
+      'status': 'rejected',
+      'rejectedBy': 'Course Teacher: $teacherName',
+      'rejectReason': reason,
+    });
+  }
+
   /// Advisor: forms assigned to THEM (via the Year+Semester+RegNo range
   /// assignment), ready for final sign-off.
   Stream<List<ExamFormModel>> getPendingForAdvisor(String advisorId) {
@@ -334,6 +349,20 @@ class ExamFormService {
       'advisorApprovedDate': DateTime.now().toIso8601String(),
       'advisorSignature': signature,
       'advisorRemark': remark,
+    });
+  }
+
+  /// Advisor: rejects the whole registration form. Student must start a
+  /// fresh registration (pay fee again & re-fill) — Req #4.
+  Future<void> advisorRejectForm(
+    String formId,
+    String advisorName,
+    String reason,
+  ) async {
+    await _db.collection(_col).doc(formId).update({
+      'status': 'rejected',
+      'rejectedBy': 'Advisor: $advisorName',
+      'rejectReason': reason,
     });
   }
 

@@ -1,23 +1,25 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// ID Strategy:
-///   Student  → NO auto ERP ID. Their college registerNo is their ID.
-///              If FY Sem I (comparative), registerNo may be empty initially.
-///   Staff    → Auto-generated: [rolePrefix][DEPT][YEAR][3-digit]
-///              Professor:    P-BIO-TECH-2026-001
-///              Coordinator:  CC-BIO-TECH-2026-001
-///              HOD:          HOD-BIO-TECH-2026-001
-///              Technical:    TECH-2026-001
-///              Non-Technical:NT-2026-001
-///              Principal:    PRIN-2026-001
+///   Student       → NO auto ERP ID. Their college registerNo is their ID.
+///                   If FY Sem I (comparative), registerNo may be empty initially.
+///   Staff         → Auto-generated: [rolePrefix][DEPT][YEAR][3-digit]
+///              Course Teacher: PROF-BIO-TECH-2026-001
+///              Advisor:        CC-BIO-TECH-2026-001
+///              HOD:            HOD-BIO-TECH-2026-001
+///              Education:      TECH-2026-001
+///              Non-Technical:  NT-2026-001
+///              Dean:           DEAN-2026-001
 class IdService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   static String _prefix(String role) {
     switch (role) {
-      case 'professor':
+      case 'course_teacher':
+      case 'professor': // legacy role key — old accounts only
         return 'PROF';
-      case 'coordinator':
+      case 'advisor':
+      case 'coordinator': // legacy role key — old accounts only
         return 'CC';
       case 'ug_incharge':
         return 'UGI';
@@ -25,9 +27,11 @@ class IdService {
         return 'PGI';
       case 'hod':
         return 'HOD';
-      case 'principal':
-        return 'PRIN';
-      case 'technical':
+      case 'dean':
+      case 'principal': // legacy role key — old accounts only
+        return 'DEAN';
+      case 'education':
+      case 'technical': // legacy role key — old accounts only
         return 'TECH';
       case 'non_technical':
         return 'NT';
@@ -53,9 +57,9 @@ class IdService {
     final yr = year.isNotEmpty ? year : DateTime.now().year.toString();
     final prefix = _prefix(role);
 
-    // Technical/Non-Technical don't use dept in their ID
+    // Education/Non-Technical/Dean don't use dept in their ID
     final counterKey =
-        (role == 'technical' || role == 'non_technical' || role == 'principal')
+        (role == 'education' || role == 'technical' || role == 'non_technical' || role == 'dean' || role == 'principal')
         ? '$prefix$yr'
         : '$prefix$dept$yr';
 
@@ -70,7 +74,7 @@ class IdService {
     final num = nextNum.toString().padLeft(3, '0');
 
     // Format: PROF-BIOTECH-2026-001 / CC-BIOTECH-2026-001 / TECH-2026-001
-    if (role == 'technical' || role == 'non_technical' || role == 'principal') {
+    if (role == 'education' || role == 'technical' || role == 'non_technical' || role == 'dean' || role == 'principal') {
       return '$prefix-$yr-$num';
     }
     return '$prefix-$dept-$yr-$num';

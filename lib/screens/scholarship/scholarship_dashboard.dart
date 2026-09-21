@@ -49,7 +49,10 @@ class _ScholarshipDashboardState extends State<ScholarshipDashboard> {
         title: const Text('Logout'),
         content: const Text('Are you sure?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
             onPressed: () => Navigator.pop(context, true),
@@ -61,7 +64,10 @@ class _ScholarshipDashboardState extends State<ScholarshipDashboard> {
     if (ok != true) return;
     await _auth.logout();
     if (!mounted) return;
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
   }
 
   @override
@@ -69,7 +75,9 @@ class _ScholarshipDashboardState extends State<ScholarshipDashboard> {
     final pages = [
       _ReviewTab(svc: _svc, color: _color),
       const _RecordsTab(),
-      _user == null ? const LoadingWidget() : ProfileScreen(user: _user!, onLogout: _logout),
+      _user == null
+          ? const LoadingWidget()
+          : ProfileScreen(user: _user!, onLogout: _logout),
     ];
 
     return Scaffold(
@@ -86,7 +94,10 @@ class _ScholarshipDashboardState extends State<ScholarshipDashboard> {
                 color: Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(_user!.erpId, style: const TextStyle(color: Colors.white, fontSize: 11)),
+              child: Text(
+                _user!.erpId,
+                style: const TextStyle(color: Colors.white, fontSize: 11),
+              ),
             ),
         ],
       ),
@@ -128,7 +139,8 @@ class _ReviewTab extends StatefulWidget {
   State<_ReviewTab> createState() => _ReviewTabState();
 }
 
-class _ReviewTabState extends State<_ReviewTab> with SingleTickerProviderStateMixin {
+class _ReviewTabState extends State<_ReviewTab>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabCtrl;
 
   @override
@@ -150,7 +162,10 @@ class _ReviewTabState extends State<_ReviewTab> with SingleTickerProviderStateMi
         TabBar(
           controller: _tabCtrl,
           labelColor: widget.color,
-          tabs: const [Tab(text: 'Pending'), Tab(text: 'Approved / History')],
+          tabs: const [
+            Tab(text: 'Pending'),
+            Tab(text: 'Approved / History'),
+          ],
         ),
         Expanded(
           child: TabBarView(
@@ -170,7 +185,8 @@ class _ReviewTabState extends State<_ReviewTab> with SingleTickerProviderStateMi
                   return ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: list.length,
-                    itemBuilder: (ctx, i) => _ScholarshipCard(item: list[i], svc: widget.svc),
+                    itemBuilder: (ctx, i) =>
+                        _ScholarshipCard(item: list[i], svc: widget.svc),
                   );
                 },
               ),
@@ -180,7 +196,10 @@ class _ReviewTabState extends State<_ReviewTab> with SingleTickerProviderStateMi
                   if (!snap.hasData) return const LoadingWidget();
                   final list = snap.data!;
                   if (list.isEmpty) {
-                    return const EmptyWidget(message: 'No records yet.', icon: Icons.history);
+                    return const EmptyWidget(
+                      message: 'No records yet.',
+                      icon: Icons.history,
+                    );
                   }
                   return ListView.builder(
                     padding: const EdgeInsets.all(16),
@@ -191,7 +210,13 @@ class _ReviewTabState extends State<_ReviewTab> with SingleTickerProviderStateMi
                         child: ListTile(
                           title: Text(s.studentName),
                           subtitle: Text('${s.scholarshipType} · ${s.status}'),
-                          trailing: Text(s.year, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                          trailing: Text(
+                            s.year,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey,
+                            ),
+                          ),
                         ),
                       );
                     },
@@ -222,7 +247,10 @@ class _ScholarshipCardState extends State<_ScholarshipCard> {
     setState(() => _busy = true);
     try {
       if (approve) {
-        await widget.svc.technicalApprove(widget.item.id, 'Scholarship Section');
+        await widget.svc.technicalApprove(
+          widget.item.id,
+          'Scholarship Section',
+        );
       } else {
         await widget.svc.technicalReject(widget.item.id, 'Scholarship Section');
       }
@@ -241,19 +269,33 @@ class _ScholarshipCardState extends State<_ScholarshipCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(s.studentName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-            Text('${s.scholarshipType} · ${s.branch} · ${s.year} / ${s.semester}',
-                style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            Text('Caste: ${s.caste} (${s.casteCategory})   Gender: ${s.gender}',
-                style: const TextStyle(fontSize: 12)),
+            Text(
+              s.studentName,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+            Text(
+              '${s.scholarshipType} · ${s.branch} · ${s.year} / ${s.semester}',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            Text(
+              'Caste: ${s.caste} (${s.casteCategory})   Gender: ${s.gender}',
+              style: const TextStyle(fontSize: 12),
+            ),
             const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: _busy ? null : () => _act(false),
-                    icon: const Icon(Icons.close, size: 16, color: AppTheme.error),
-                    label: const Text('Reject', style: TextStyle(color: AppTheme.error)),
+                    icon: const Icon(
+                      Icons.close,
+                      size: 16,
+                      color: AppTheme.error,
+                    ),
+                    label: const Text(
+                      'Reject',
+                      style: TextStyle(color: AppTheme.error),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -262,7 +304,9 @@ class _ScholarshipCardState extends State<_ScholarshipCard> {
                     onPressed: _busy ? null : () => _act(true),
                     icon: const Icon(Icons.check, size: 16),
                     label: const Text('Approve'),
-                    style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.success,
+                    ),
                   ),
                 ),
               ],
@@ -283,7 +327,8 @@ class _RecordsTab extends StatefulWidget {
   State<_RecordsTab> createState() => _RecordsTabState();
 }
 
-class _RecordsTabState extends State<_RecordsTab> with SingleTickerProviderStateMixin {
+class _RecordsTabState extends State<_RecordsTab>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabCtrl;
 
   @override
@@ -305,7 +350,10 @@ class _RecordsTabState extends State<_RecordsTab> with SingleTickerProviderState
         TabBar(
           controller: _tabCtrl,
           labelColor: AppTheme.primary,
-          tabs: const [Tab(text: 'Admission Data'), Tab(text: 'Registration Forms')],
+          tabs: const [
+            Tab(text: 'Admission Data'),
+            Tab(text: 'Registration Forms'),
+          ],
         ),
         Expanded(
           child: TabBarView(
@@ -319,30 +367,42 @@ class _RecordsTabState extends State<_RecordsTab> with SingleTickerProviderState
 }
 
 class _FilterBar extends StatelessWidget {
+  // Req: first filter is now the broad Caste Category (SC/ST/OBC/...)
+  // instead of the raw caste name — simpler to scan. When a category is
+  // selected, a second "Caste" dropdown appears so staff can narrow
+  // further within that category if it has a lot of matching students.
+  final String? category;
   final String? caste;
   final String? gender;
   final String? year;
   final String? semester;
+  final List<String> categories;
   final List<String> castes;
   final List<String> years;
   final List<String> semesters;
+  final ValueChanged<String?> onCategory;
   final ValueChanged<String?> onCaste;
   final ValueChanged<String?> onGender;
   final ValueChanged<String?> onYear;
   final ValueChanged<String?> onSemester;
   const _FilterBar({
+    this.category,
     required this.caste,
     required this.gender,
     required this.year,
     required this.semester,
+    this.categories = const [],
     required this.castes,
     required this.years,
     required this.semesters,
+    ValueChanged<String?>? onCategory,
     required this.onCaste,
     required this.onGender,
     required this.onYear,
     required this.onSemester,
-  });
+  }) : onCategory = onCategory ?? _noop;
+
+  static void _noop(String? _) {}
 
   @override
   Widget build(BuildContext context) {
@@ -351,9 +411,28 @@ class _FilterBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
         children: [
-          _dropdown('Caste', caste, castes, onCaste),
-          const SizedBox(width: 8),
-          _dropdown('Gender', gender, const ['Male', 'Female', 'Other'], onGender),
+          if (categories.isNotEmpty) ...[
+            _dropdown('Category', category, categories, onCategory),
+            const SizedBox(width: 8),
+          ],
+          // Secondary, narrower filter — only shown once a Category is
+          // picked, so staff can drill into the specific caste when a
+          // category has a lot of matching students.
+          if (categories.isNotEmpty &&
+              category != null &&
+              castes.isNotEmpty) ...[
+            _dropdown('Caste', caste, castes, onCaste),
+            const SizedBox(width: 8),
+          ],
+          if (categories.isEmpty) ...[
+            _dropdown('Caste', caste, castes, onCaste),
+            const SizedBox(width: 8),
+          ],
+          _dropdown('Gender', gender, const [
+            'Male',
+            'Female',
+            'Other',
+          ], onGender),
           const SizedBox(width: 8),
           _dropdown('Year', year, years, onYear),
           const SizedBox(width: 8),
@@ -363,14 +442,24 @@ class _FilterBar extends StatelessWidget {
     );
   }
 
-  Widget _dropdown(String label, String? value, List<String> options, ValueChanged<String?> onChanged) {
+  Widget _dropdown(
+    String label,
+    String? value,
+    List<String> options,
+    ValueChanged<String?> onChanged,
+  ) {
     return DropdownButton<String?>(
       hint: Text(label, style: const TextStyle(fontSize: 12.5)),
       value: value,
       underline: const SizedBox.shrink(),
       items: [
         const DropdownMenuItem<String?>(value: null, child: Text('All')),
-        ...options.map((o) => DropdownMenuItem<String?>(value: o, child: Text(o, style: const TextStyle(fontSize: 12.5)))),
+        ...options.map(
+          (o) => DropdownMenuItem<String?>(
+            value: o,
+            child: Text(o, style: const TextStyle(fontSize: 12.5)),
+          ),
+        ),
       ],
       onChanged: onChanged,
     );
@@ -385,6 +474,7 @@ class _AdmissionDataView extends StatefulWidget {
 
 class _AdmissionDataViewState extends State<_AdmissionDataView> {
   final _userSvc = UserService();
+  String? _category;
   String? _caste;
   String? _gender;
   String? _year;
@@ -398,26 +488,76 @@ class _AdmissionDataViewState extends State<_AdmissionDataView> {
       builder: (ctx, snap) {
         if (!snap.hasData) return const LoadingWidget();
         var list = snap.data!;
-        if (_caste != null) list = list.where((s) => s.caste == _caste).toList();
-        if (_gender != null) list = list.where((s) => s.gender == _gender).toList();
+        // Req: broad Category filter first (simpler to scan), then the
+        // specific Caste filter narrows further within that category —
+        // handy when a category has a lot of matching students.
+        if (_category != null)
+          list = list.where((s) => s.actualCasteCategory == _category).toList();
+        if (_caste != null)
+          list = list.where((s) => s.caste == _caste).toList();
+        if (_gender != null)
+          list = list.where((s) => s.gender == _gender).toList();
         if (_year != null) list = list.where((s) => s.year == _year).toList();
-        if (_semester != null) list = list.where((s) => s.semester == _semester).toList();
-        list.sort((a, b) => _sortAsc ? a.name.compareTo(b.name) : b.name.compareTo(a.name));
+        if (_semester != null)
+          list = list.where((s) => s.semester == _semester).toList();
+        list.sort(
+          (a, b) =>
+              _sortAsc ? a.name.compareTo(b.name) : b.name.compareTo(a.name),
+        );
 
-        final castes = snap.data!.map((s) => s.caste).where((c) => c.isNotEmpty).toSet().toList()..sort();
-        final years = snap.data!.map((s) => s.year).where((c) => c.isNotEmpty).toSet().toList()..sort();
-        final sems = snap.data!.map((s) => s.semester).where((c) => c.isNotEmpty).toSet().toList()..sort();
+        final categories =
+            snap.data!
+                .map((s) => s.actualCasteCategory)
+                .where((c) => c.isNotEmpty)
+                .toSet()
+                .toList()
+              ..sort();
+        // Castes available for narrowing: within the selected category if
+        // one is chosen, otherwise across everyone.
+        final castePool = _category == null
+            ? snap.data!
+            : snap.data!
+                  .where((s) => s.actualCasteCategory == _category)
+                  .toList();
+        final castes =
+            castePool
+                .map((s) => s.caste)
+                .where((c) => c.isNotEmpty)
+                .toSet()
+                .toList()
+              ..sort();
+        final years =
+            snap.data!
+                .map((s) => s.year)
+                .where((c) => c.isNotEmpty)
+                .toSet()
+                .toList()
+              ..sort();
+        final sems =
+            snap.data!
+                .map((s) => s.semester)
+                .where((c) => c.isNotEmpty)
+                .toSet()
+                .toList()
+              ..sort();
 
         return Column(
           children: [
             _FilterBar(
+              category: _category,
               caste: _caste,
               gender: _gender,
               year: _year,
               semester: _semester,
+              categories: categories,
               castes: castes,
               years: years,
               semesters: sems,
+              onCategory: (v) => setState(() {
+                _category = v;
+                _caste =
+                    null; // reset the narrower filter when category changes
+              }),
               onCaste: (v) => setState(() => _caste = v),
               onGender: (v) => setState(() => _gender = v),
               onYear: (v) => setState(() => _year = v),
@@ -428,10 +568,19 @@ class _AdmissionDataViewState extends State<_AdmissionDataView> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('${list.length} students', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  Flexible(
+                    child: Text(
+                      '${list.length} students',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ),
                   TextButton.icon(
                     onPressed: () => setState(() => _sortAsc = !_sortAsc),
-                    icon: Icon(_sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 14),
+                    icon: Icon(
+                      _sortAsc ? Icons.arrow_upward : Icons.arrow_downward,
+                      size: 14,
+                    ),
                     label: const Text('Name', style: TextStyle(fontSize: 12)),
                   ),
                 ],
@@ -439,7 +588,10 @@ class _AdmissionDataViewState extends State<_AdmissionDataView> {
             ),
             Expanded(
               child: list.isEmpty
-                  ? const EmptyWidget(message: 'No students match these filters.', icon: Icons.people_outline)
+                  ? const EmptyWidget(
+                      message: 'No students match these filters.',
+                      icon: Icons.people_outline,
+                    )
                   : ListView.builder(
                       padding: const EdgeInsets.all(12),
                       itemCount: list.length,
@@ -448,8 +600,10 @@ class _AdmissionDataViewState extends State<_AdmissionDataView> {
                         return Card(
                           child: ListTile(
                             title: Text(s.name),
-                            subtitle: Text('${s.erpId} · ${s.branch} · ${s.year}/${s.semester} · ${s.gender} · ${s.caste}',
-                                style: const TextStyle(fontSize: 11.5)),
+                            subtitle: Text(
+                              '${s.erpId} · ${s.branch} · ${s.year}/${s.semester} · ${s.gender} · ${s.caste}',
+                              style: const TextStyle(fontSize: 11.5),
+                            ),
                           ),
                         );
                       },
@@ -481,10 +635,23 @@ class _RegistrationDataViewState extends State<_RegistrationDataView> {
         if (!snap.hasData) return const LoadingWidget();
         var list = snap.data!.where((f) => f.startedAsRegistration).toList();
         if (_year != null) list = list.where((f) => f.year == _year).toList();
-        if (_semester != null) list = list.where((f) => f.semester == _semester).toList();
+        if (_semester != null)
+          list = list.where((f) => f.semester == _semester).toList();
 
-        final years = snap.data!.map((f) => f.year).where((c) => c.isNotEmpty).toSet().toList()..sort();
-        final sems = snap.data!.map((f) => f.semester).where((c) => c.isNotEmpty).toSet().toList()..sort();
+        final years =
+            snap.data!
+                .map((f) => f.year)
+                .where((c) => c.isNotEmpty)
+                .toSet()
+                .toList()
+              ..sort();
+        final sems =
+            snap.data!
+                .map((f) => f.semester)
+                .where((c) => c.isNotEmpty)
+                .toSet()
+                .toList()
+              ..sort();
 
         return Column(
           children: [
@@ -506,19 +673,35 @@ class _RegistrationDataViewState extends State<_RegistrationDataView> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('${list.length} forms', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  Flexible(
+                    child: Text(
+                      '${list.length} forms',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ),
                   if (list.isNotEmpty)
                     TextButton.icon(
-                      onPressed: () => printClassSummaryTable(context, 'Registration Form Records', list),
+                      onPressed: () => printClassSummaryTable(
+                        context,
+                        'Registration Form Records',
+                        list,
+                      ),
                       icon: const Icon(Icons.image_outlined, size: 14),
-                      label: const Text('Generate', style: TextStyle(fontSize: 12)),
+                      label: const Text(
+                        'Generate',
+                        style: TextStyle(fontSize: 12),
+                      ),
                     ),
                 ],
               ),
             ),
             Expanded(
               child: list.isEmpty
-                  ? const EmptyWidget(message: 'No registration forms match these filters.', icon: Icons.edit_document)
+                  ? const EmptyWidget(
+                      message: 'No registration forms match these filters.',
+                      icon: Icons.edit_document,
+                    )
                   : ListView.builder(
                       padding: const EdgeInsets.all(12),
                       itemCount: list.length,
@@ -533,7 +716,8 @@ class _RegistrationDataViewState extends State<_RegistrationDataView> {
                             ),
                             trailing: IconButton(
                               icon: const Icon(Icons.image_outlined, size: 20),
-                              onPressed: () => printStudentSubjectTable(context, f),
+                              onPressed: () =>
+                                  printStudentSubjectTable(context, f),
                             ),
                           ),
                         );

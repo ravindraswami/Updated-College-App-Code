@@ -45,7 +45,7 @@ class NtFileService {
         );
   }
 
-  /// Get all NT files — for Principal only
+  /// Get all NT files — for Dean only
   Stream<List<NtFileModel>> getAllFiles() {
     return _db
         .collection(_col)

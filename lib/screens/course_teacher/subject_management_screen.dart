@@ -511,7 +511,7 @@ class _SubjectManagementBodyState extends State<SubjectManagementBody> {
                         // 8. Course Teacher
                         const SizedBox(height: 10),
                         StreamBuilder<List<UserModel>>(
-                          stream: _userSvc.getUsersByRole('professor'),
+                          stream: _userSvc.getUsersByRole('course_teacher', legacyRole: 'professor'),
                           builder: (ctx, snap) {
                             final teachers = snap.data ?? [];
                             return DropdownButtonFormField<String>(
@@ -862,7 +862,7 @@ class _TeacherPickerDialogState extends State<_TeacherPickerDialog> {
           overflow: TextOverflow.ellipsis),
       content: SingleChildScrollView(
         child: StreamBuilder<List<UserModel>>(
-          stream: widget.userSvc.getUsersByRole('professor'),
+          stream: widget.userSvc.getUsersByRole('course_teacher', legacyRole: 'professor'),
           builder: (ctx, snap) {
             final teachers = snap.data ?? [];
             if (!snap.hasData) {

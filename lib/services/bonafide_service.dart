@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/bonafide_model.dart';
+import '../utils/academic_data.dart';
 
 class BonafideService {
   final _db = FirebaseFirestore.instance;
@@ -14,7 +15,12 @@ class BonafideService {
     required String rollNo,
     required String purpose,
     double charges = 50.0,
+    String admissionDate = '',
   }) async {
+    final academicYear = AcademicData.defaultAcademicYearFor(
+      admissionDate: admissionDate,
+      yearId: year,
+    );
     final ref = await _db.collection('bonafide_requests').add({
       'studentId': studentId,
       'studentName': studentName,
@@ -33,6 +39,7 @@ class BonafideService {
       'approvedDate': '',
       'pdfUrl': '',
       'createdAt': FieldValue.serverTimestamp(),
+      'academicYear': academicYear,
     });
     return ref.id;
   }

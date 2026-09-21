@@ -12,13 +12,13 @@ import '../auth/login_screen.dart';
 import '../profile/profile_screen.dart';
 import 'monthly_report_screen.dart';
 
-class PrincipalDashboard extends StatefulWidget {
-  const PrincipalDashboard({super.key});
+class DeanDashboard extends StatefulWidget {
+  const DeanDashboard({super.key});
   @override
-  State<PrincipalDashboard> createState() => _PrincipalDashboardState();
+  State<DeanDashboard> createState() => _DeanDashboardState();
 }
 
-class _PrincipalDashboardState extends State<PrincipalDashboard> {
+class _DeanDashboardState extends State<DeanDashboard> {
   final _auth = AuthService();
   final _userSvc = UserService();
   UserModel? _user;
@@ -362,13 +362,17 @@ class _AllStaffTab extends StatelessWidget {
         final staff = snap.data!
             .where(
               (u) => [
-                'professor',
-                'coordinator',
+                'course_teacher',
+                'professor', // legacy role key — old accounts only
+                'advisor',
+                'coordinator', // legacy role key — old accounts only
                 'ug_incharge',
                 'pg_incharge',
                 'hod',
-                'principal',
-                'technical',
+                'dean',
+                'principal', // legacy role key — old accounts only
+                'education',
+                'technical', // legacy role key — old accounts only
                 'non_technical',
                 'scholarship',
               ].contains(u.role),
@@ -409,8 +413,8 @@ class _AllStaffTab extends StatelessWidget {
                       size: 20,
                     ),
                     const SizedBox(width: 4),
-                    // Fix 3: delete button (principal can delete staff/Incharge)
-                    if (u.role != 'principal')
+                    // Fix 3: delete button (Dean can delete staff/Incharge)
+                    if (u.role != 'dean' && u.role != 'principal')
                       IconButton(
                         icon: const Icon(Icons.delete_outline, color: AppTheme.error, size: 20),
                         tooltip: 'Delete ${AppConstants.roleLabel(u.role)}',
@@ -518,7 +522,7 @@ class _PendingApprovalsTab extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-// NT Staff Files Tab  (visible to Principal only)
+// NT Staff Files Tab  (visible to Dean only)
 // ─────────────────────────────────────────────────────────────
 class _NtFilesTab extends StatefulWidget {
   const _NtFilesTab();
@@ -742,17 +746,24 @@ class _NtFilesTabState extends State<_NtFilesTab> {
                     ),
                     child: Row(
                       children: [
-                        Text(
-                          '${files.length} file(s)',
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 12,
+                        Flexible(
+                          child: Text(
+                            '${files.length} file(s)',
+                            style: const TextStyle(
+                              color: Colors.grey,
+                              fontSize: 12,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const Spacer(),
-                        const Text(
-                          'Visible only to Principal',
-                          style: TextStyle(color: Colors.grey, fontSize: 11),
+                        const SizedBox(width: 8),
+                        const Flexible(
+                          child: Text(
+                            'Visible only to Dean',
+                            style: TextStyle(color: Colors.grey, fontSize: 11),
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.end,
+                          ),
                         ),
                       ],
                     ),

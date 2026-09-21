@@ -4,14 +4,17 @@ import '../models/user_model.dart';
 class UserService {
   final _db = FirebaseFirestore.instance;
 
-  Stream<List<UserModel>> getUsersByRole(String role) {
-    return _db
-        .collection('users')
-        .where('role', isEqualTo: role)
-        .snapshots()
-        .map(
-          (s) => s.docs.map((d) => UserModel.fromMap(d.data(), d.id)).toList(),
-        );
+  /// [legacyRole], if given, is matched too — use this while some
+  /// existing accounts still have the old role key and haven't been
+  /// migrated to the new one yet (e.g. getUsersByRole('advisor',
+  /// legacyRole: 'coordinator')).
+  Stream<List<UserModel>> getUsersByRole(String role, {String? legacyRole}) {
+    final query = legacyRole == null
+        ? _db.collection('users').where('role', isEqualTo: role)
+        : _db.collection('users').where('role', whereIn: [role, legacyRole]);
+    return query.snapshots().map(
+      (s) => s.docs.map((d) => UserModel.fromMap(d.data(), d.id)).toList(),
+    );
   }
 
   Stream<List<UserModel>> getAllUsers() {
@@ -110,10 +113,11 @@ class UserService {
   // Returns the coordinator whose slot still has room in the given class.
   // Called during student registration.
   Future<String?> findCoordinatorForStudent(String classId) async {
-    // Get all coordinators for this class
+    // Get all coordinators/advisors for this class (whereIn matches both
+    // the new 'advisor' role key and the legacy 'coordinator' key).
     final snap = await _db
         .collection('users')
-        .where('role', isEqualTo: 'coordinator')
+        .where('role', whereIn: ['advisor', 'coordinator'])
         .where('classId', isEqualTo: classId)
         .where('isApproved', isEqualTo: true)
         .get();

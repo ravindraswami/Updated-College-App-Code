@@ -13,13 +13,13 @@ import '../notes/notes_screen.dart';
 import '../notes/upload_note_screen.dart';
 import 'advisor_registration_screen.dart';
 
-class CoordinatorDashboard extends StatefulWidget {
-  const CoordinatorDashboard({super.key});
+class AdvisorDashboard extends StatefulWidget {
+  const AdvisorDashboard({super.key});
   @override
-  State<CoordinatorDashboard> createState() => _CoordinatorDashboardState();
+  State<AdvisorDashboard> createState() => _AdvisorDashboardState();
 }
 
-class _CoordinatorDashboardState extends State<CoordinatorDashboard> {
+class _AdvisorDashboardState extends State<AdvisorDashboard> {
   final _auth = AuthService();
   final _svc = UserService();
   UserModel? _user;
@@ -762,16 +762,26 @@ class _PendingCard extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () async {
-                      await svc.rejectUser(student.id);
-                      if (context.mounted)
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              '${student.displayName}\'s request rejected.',
+                      try {
+                        await svc.rejectUser(student.id);
+                        if (context.mounted)
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '${student.displayName}\'s request rejected.',
+                              ),
+                              backgroundColor: AppTheme.error,
                             ),
-                            backgroundColor: AppTheme.error,
-                          ),
-                        );
+                          );
+                      } catch (e) {
+                        if (context.mounted)
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Could not reject: $e'),
+                              backgroundColor: AppTheme.error,
+                            ),
+                          );
+                      }
                     },
                     icon: const Icon(Icons.close, size: 16),
                     label: const Text('Reject'),
@@ -785,16 +795,36 @@ class _PendingCard extends StatelessWidget {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () async {
-                      await svc.approveUser(student.id);
-                      if (context.mounted)
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              '${student.displayName} approved and can now login.',
+                      try {
+                        await svc.approveUser(student.id);
+                        if (context.mounted)
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '${student.displayName} approved and can now login.',
+                              ),
+                              backgroundColor: AppTheme.success,
                             ),
-                            backgroundColor: AppTheme.success,
-                          ),
-                        );
+                          );
+                      } catch (e) {
+                        // Previously this error was thrown and never
+                        // caught, so the success SnackBar simply never
+                        // ran and the card silently stayed in the
+                        // Pending list with no visible feedback at all.
+                        // Now the coordinator actually sees why it
+                        // failed (most likely cause: Firestore security
+                        // rules blocking a coordinator from writing to
+                        // another user's document — check that the
+                        // rules allow a coordinator/advisor to update
+                        // isApproved on their assigned students).
+                        if (context.mounted)
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Could not approve: $e'),
+                              backgroundColor: AppTheme.error,
+                            ),
+                          );
+                      }
                     },
                     icon: const Icon(Icons.check, size: 16),
                     label: const Text('Approve'),

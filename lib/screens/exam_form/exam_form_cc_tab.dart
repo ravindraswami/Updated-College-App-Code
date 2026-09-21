@@ -369,8 +369,11 @@ class _CcFormCard extends StatelessWidget {
                   children: [
                     const Icon(Icons.currency_rupee, color: Colors.teal, size: 14),
                     const SizedBox(width: 4),
-                    const Text('Total Estimated Fee: ',
-                        style: TextStyle(fontSize: 12, color: Colors.teal)),
+                    const Flexible(
+                      child: Text('Total Estimated Fee: ',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12, color: Colors.teal)),
+                    ),
                     Text('₹${grandTotal.toStringAsFixed(0)}',
                         style: const TextStyle(
                             fontWeight: FontWeight.bold,

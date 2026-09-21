@@ -35,7 +35,7 @@ class SubjectService {
     await _db.collection(_col).doc(subjectId).delete();
   }
 
-  // Get all subjects (for Incharge, Principal, all staff)
+  // Get all subjects (for Incharge, Dean, all staff)
   Stream<List<SubjectModel>> getAllSubjects() {
     return _db
         .collection(_col)

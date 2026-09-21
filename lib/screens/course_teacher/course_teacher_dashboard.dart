@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:smart_exam/screens/professor/exam_management_screen.dart';
-import 'package:smart_exam/screens/professor/professor_results_screen.dart';
+import 'package:smart_exam/screens/course_teacher/exam_management_screen.dart';
+import 'package:smart_exam/screens/course_teacher/course_teacher_results_screen.dart';
 import '../../services/auth_service.dart';
 import '../../models/user_model.dart';
 import '../../utils/app_theme.dart';
@@ -13,13 +13,13 @@ import '../profile/profile_screen.dart';
 import '../notes/notes_screen.dart';
 import '../notes/upload_note_screen.dart';
 
-class ProfessorDashboard extends StatefulWidget {
-  const ProfessorDashboard({super.key});
+class CourseTeacherDashboard extends StatefulWidget {
+  const CourseTeacherDashboard({super.key});
   @override
-  State<ProfessorDashboard> createState() => _ProfessorDashboardState();
+  State<CourseTeacherDashboard> createState() => _CourseTeacherDashboardState();
 }
 
-class _ProfessorDashboardState extends State<ProfessorDashboard> {
+class _CourseTeacherDashboardState extends State<CourseTeacherDashboard> {
   final _auth = AuthService();
   UserModel? _user;
   int _bottomIndex = 0;
@@ -98,7 +98,7 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
       case 0:
         return ExamManagementScreen(professorId: _user!.id);
       case 1:
-        return ProfessorResultsScreen(professorId: _user!.id);
+        return CourseTeacherResultsScreen(professorId: _user!.id);
       case 2:
         return const NotesScreen();
       case 3:

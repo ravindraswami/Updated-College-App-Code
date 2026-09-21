@@ -503,7 +503,8 @@ class _ScholarshipFormScreenState extends State<_ScholarshipFormScreen> {
   final _svc = ScholarshipService();
 
   // Student-entered fields only
-  String? _scholarshipType;
+  String? _scholarshipCategory;
+  String? _scholarshipName;
   String _formFilledStatus = 'no'; // radio: yes/no
   String _applicationStatus = 'pending'; // radio: pending/approved
 
@@ -511,17 +512,41 @@ class _ScholarshipFormScreenState extends State<_ScholarshipFormScreen> {
   PlatformFile? _pdfFile;
   bool _isSubmitting = false;
 
-  static const _scholarshipTypes = [
-    'EBC Punjabrao',
-    'EBC Rajarshi Shahu Maharaj',
-    'OBC GOI',
-    'OBC Freeship',
-    'SC/ST GOI',
-    'SC/ST Freeship',
-    'VJNT GOI',
-    'VJNT Freeship',
-    'Swadhar Dr. Babasaheb Ambedkar',
-  ];
+  // Req: replaced the old flat scholarship list with the college's actual
+  // category-wise scholarship list. Category is picked first, then the
+  // scholarship name within that category (mirrors the Branch→Year cascade).
+  static const Map<String, List<String>> _scholarshipCategories = {
+    'Open': [
+      'Rajarshi Chhatrapati Shahu Maharaj Shikshan Shulkh',
+      'Dr. Panjabrao Deshmukh Vasatigruh Nirvah Bhatta Yojna (AGR)',
+    ],
+    'SC': [
+      'Government of India',
+      'Post-Matric Tuition Fee and Examination Fee (Freeship)',
+      'Physically Disable',
+    ],
+    'ST': [
+      'Government of India',
+      'Post-Matric Tuition Fee and Examination Fee (Freeship)',
+    ],
+    'OBC': [
+      'Government of India',
+      'Post-Matric Tuition Fee and Examination Fee (Freeship)',
+    ],
+    'VJNT': [
+      'Government of India',
+      'Post-Matric Tuition Fee and Examination Fee (Freeship)',
+    ],
+    'SEBC': [
+      'Government of India',
+      'Post-Matric Tuition Fee and Examination Fee (Freeship)',
+    ],
+    'TCAR': [
+      'NTS',
+      'JRF',
+      'SRF',
+    ],
+  };
 
   Future<void> _pickPdf() async {
     try {
@@ -552,7 +577,7 @@ class _ScholarshipFormScreenState extends State<_ScholarshipFormScreen> {
     try {
       await _svc.submitScholarship(
         student: widget.student,
-        scholarshipType: _scholarshipType!,
+        scholarshipType: '$_scholarshipCategory — $_scholarshipName',
         formFilledStatus: _formFilledStatus,
         applicationStatus: _applicationStatus,
         pdfBytes: _pdfFile?.bytes?.toList(),
@@ -660,14 +685,39 @@ class _ScholarshipFormScreenState extends State<_ScholarshipFormScreen> {
               const SizedBox(height: 10),
 
               DropdownButtonFormField<String>(
-                value: _scholarshipType,
+                value: _scholarshipCategory,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Scholarship Category',
+                  prefixIcon: Icon(Icons.category_outlined),
+                ),
+                hint: const Text('Select category'),
+                items: _scholarshipCategories.keys
+                    .map(
+                      (cat) => DropdownMenuItem(
+                        value: cat,
+                        child: Text(cat, overflow: TextOverflow.ellipsis),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) => setState(() {
+                  _scholarshipCategory = v;
+                  _scholarshipName = null; // reset dependent field
+                }),
+                validator: (v) =>
+                    v == null ? 'Please select a scholarship category.' : null,
+              ),
+              const SizedBox(height: 14),
+
+              DropdownButtonFormField<String>(
+                value: _scholarshipName,
                 isExpanded: true,
                 decoration: const InputDecoration(
                   labelText: 'Which Scholarship to Apply For',
                   prefixIcon: Icon(Icons.school_outlined),
                 ),
-                hint: const Text('Select scholarship type'),
-                items: _scholarshipTypes
+                hint: const Text('Select scholarship'),
+                items: (_scholarshipCategories[_scholarshipCategory] ?? [])
                     .map(
                       (t) => DropdownMenuItem(
                         value: t,
@@ -675,7 +725,9 @@ class _ScholarshipFormScreenState extends State<_ScholarshipFormScreen> {
                       ),
                     )
                     .toList(),
-                onChanged: (v) => setState(() => _scholarshipType = v),
+                onChanged: _scholarshipCategory == null
+                    ? null
+                    : (v) => setState(() => _scholarshipName = v),
                 validator: (v) =>
                     v == null ? 'Please select a scholarship type.' : null,
               ),

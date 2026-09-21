@@ -11,31 +11,31 @@ import '../../utils/class_constants.dart';
 import '../../widgets/common_widgets.dart';
 
 /// Thin wrapper with its own Scaffold + AppBar, for full-screen navigation.
-class HodAssignmentScreen extends StatelessWidget {
+class InchargeAssignmentScreen extends StatelessWidget {
   final UserModel hod;
   final String fixedBranch;
-  const HodAssignmentScreen({super.key, required this.hod, this.fixedBranch = ''});
+  const InchargeAssignmentScreen({super.key, required this.hod, this.fixedBranch = ''});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Assign Advisor & Course Teacher')),
-      body: HodAssignmentBody(hod: hod, fixedBranch: fixedBranch),
+      body: InchargeAssignmentBody(hod: hod, fixedBranch: fixedBranch),
     );
   }
 }
 
 /// Reusable body (no Scaffold/AppBar) — safe to embed inside a tab.
-class HodAssignmentBody extends StatefulWidget {
+class InchargeAssignmentBody extends StatefulWidget {
   final UserModel hod;
   final String fixedBranch; // '' = free choice; else locked to this branch
-  const HodAssignmentBody({super.key, required this.hod, this.fixedBranch = ''});
+  const InchargeAssignmentBody({super.key, required this.hod, this.fixedBranch = ''});
 
   @override
-  State<HodAssignmentBody> createState() => _HodAssignmentBodyState();
+  State<InchargeAssignmentBody> createState() => _InchargeAssignmentBodyState();
 }
 
-class _HodAssignmentBodyState extends State<HodAssignmentBody> {
+class _InchargeAssignmentBodyState extends State<InchargeAssignmentBody> {
   final _subjectSvc = SubjectService();
   final _userSvc = UserService();
   final _advisorSvc = ClassAdvisorAssignmentService();
@@ -352,7 +352,7 @@ class _HodAssignmentBodyState extends State<HodAssignmentBody> {
           ),
           const SizedBox(height: 10),
           StreamBuilder<List<UserModel>>(
-            stream: _userSvc.getUsersByRole('coordinator'),
+            stream: _userSvc.getUsersByRole('advisor', legacyRole: 'coordinator'),
             builder: (ctx, snap) {
               final advisors = snap.data ?? [];
               if (snap.hasData && advisors.isEmpty) {
@@ -432,8 +432,20 @@ class _HodAssignmentBodyState extends State<HodAssignmentBody> {
                 children: list.map((a) => _AdvisorCard(
                       assignment: a,
                       onDelete: () async {
-                        await _advisorSvc.deleteAssignment(a.id);
-                        if (context.mounted) _snack('Assignment removed.');
+                        try {
+                          await _advisorSvc.deleteAssignment(a.id);
+                          if (context.mounted) _snack('Assignment removed.');
+                        } catch (e) {
+                          // Previously this error was silently swallowed —
+                          // the assignment looked like it "didn't delete"
+                          // because nothing told you WHY it failed (almost
+                          // always a Firestore permission rule blocking
+                          // the delete for this role). Now you'll see the
+                          // real reason.
+                          if (context.mounted) {
+                            _snack('Could not remove assignment: $e', isError: true);
+                          }
+                        }
                       },
                     )).toList(),
               );
@@ -550,7 +562,7 @@ class _SemesterSubjectsPanel extends StatelessWidget {
           );
         }
         return StreamBuilder<List<UserModel>>(
-          stream: userSvc.getUsersByRole('professor'),
+          stream: userSvc.getUsersByRole('course_teacher', legacyRole: 'professor'),
           builder: (ctx2, snap2) {
             final teachers = snap2.data ?? [];
             return Column(

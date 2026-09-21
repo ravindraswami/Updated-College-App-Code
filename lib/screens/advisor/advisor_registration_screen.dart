@@ -165,6 +165,7 @@ class _PendingCard extends StatefulWidget {
 class _PendingCardState extends State<_PendingCard> {
   String _signature = 'RR';
   bool _approving = false;
+  bool _rejecting = false;
 
   Future<void> _approve() async {
     setState(() => _approving = true);
@@ -190,6 +191,67 @@ class _PendingCardState extends State<_PendingCard> {
     }
   }
 
+  Future<void> _reject() async {
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Reject Registration Form'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Rejecting ${widget.form.name}\'s registration form. '
+              'They will need to pay the fee and fill the form again.',
+              style: const TextStyle(color: Colors.grey, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Reason for rejection',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Reject'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final reason = ctrl.text.trim().isNotEmpty
+        ? ctrl.text.trim()
+        : 'Rejected by Advisor';
+    setState(() => _rejecting = true);
+    try {
+      await ExamFormService().advisorRejectForm(widget.form.id, widget.advisorName, reason);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Rejected.'), backgroundColor: AppTheme.error),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed: $e'), backgroundColor: AppTheme.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _rejecting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final f = widget.form;
@@ -210,17 +272,16 @@ class _PendingCardState extends State<_PendingCard> {
               style: const TextStyle(fontSize: 12.5),
             ),
             const SizedBox(height: 10),
-            Row(
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 6,
+              runSpacing: 6,
               children: [
                 const Text('Signature:', style: TextStyle(fontSize: 12.5)),
-                const SizedBox(width: 8),
-                ...['RR', 'OFE', 'NR'].map((opt) => Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: ChoiceChip(
-                        label: Text(opt),
-                        selected: _signature == opt,
-                        onSelected: (_) => setState(() => _signature = opt),
-                      ),
+                ...['RR', 'OFE', 'NR'].map((opt) => ChoiceChip(
+                      label: Text(opt),
+                      selected: _signature == opt,
+                      onSelected: (_) => setState(() => _signature = opt),
                     )),
               ],
             ),
@@ -236,8 +297,21 @@ class _PendingCardState extends State<_PendingCard> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _rejecting || _approving ? null : _reject,
+                    icon: _rejecting
+                        ? const SizedBox(
+                            width: 14, height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.error))
+                        : const Icon(Icons.close, size: 16, color: AppTheme.error),
+                    label: const Text('Reject', style: TextStyle(color: AppTheme.error)),
+                    style: OutlinedButton.styleFrom(side: const BorderSide(color: AppTheme.error)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _approving ? null : _approve,
+                    onPressed: _approving || _rejecting ? null : _approve,
                     icon: _approving
                         ? const SizedBox(
                             width: 14, height: 14,

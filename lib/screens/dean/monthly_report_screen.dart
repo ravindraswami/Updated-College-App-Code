@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/certificate_widgets.dart' as certw;
 import '../shared/certificate_preview_screen.dart';
+import '../../services/user_service.dart';
+import '../../utils/academic_data.dart';
 
 /// Fix 7 — Month-wise image report for Bonafide, Character, Transfer, Exam Form, Scholarship
 /// Filters by: report type + month + year + (optional) studentId
@@ -18,6 +20,7 @@ class MonthlyReportScreen extends StatefulWidget {
 
 class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
   final _db = FirebaseFirestore.instance;
+  final _userSvc = UserService();
 
   // Filter state
   String _reportType = 'bonafide';
@@ -25,9 +28,47 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
   int _selectedYear = DateTime.now().year;
   final _studentIdCtrl = TextEditingController();
 
+  // Req #3 (Education): for the Exam Form report, further refine by
+  // academic Year / Semester / Caste / Gender. Options are built from
+  // whatever values actually appear in the fetched records, so the
+  // filters always show exactly as many years/semesters/castes/genders
+  // as exist in the data.
+  String? _filterYear;
+  String? _filterSemester;
+  String? _filterCaste;
+  String? _filterGender;
+
   bool _loading = false;
   bool _generating = false;
   List<Map<String, dynamic>> _results = [];
+
+  List<Map<String, dynamic>> get _filteredResults {
+    if (_reportType != 'exam_form') return _results;
+    return _results.where((r) {
+      if (_filterYear != null && (r['year'] ?? '') != _filterYear) return false;
+      if (_filterSemester != null && (r['semester'] ?? '') != _filterSemester) return false;
+      if (_filterCaste != null && (r['casteCategory'] ?? '') != _filterCaste) return false;
+      if (_filterGender != null && (r['gender'] ?? '') != _filterGender) return false;
+      return true;
+    }).toList();
+  }
+
+  List<String> _distinctValues(String field) {
+    final set = <String>{};
+    for (final r in _results) {
+      final v = (r[field] ?? '').toString().trim();
+      if (v.isNotEmpty) set.add(v);
+    }
+    final list = set.toList()..sort();
+    return list;
+  }
+
+  void _resetExamFormFilters() {
+    _filterYear = null;
+    _filterSemester = null;
+    _filterCaste = null;
+    _filterGender = null;
+  }
 
   // Report type definitions
   static const _types = {
@@ -49,7 +90,7 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
   }
 
   Future<void> _fetchReport() async {
-    setState(() { _loading = true; _results = []; });
+    setState(() { _loading = true; _results = []; _resetExamFormFilters(); });
     try {
       final def = _types[_reportType]!;
       final start = DateTime(_selectedYear, _selectedMonth, 1);
@@ -65,12 +106,34 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
       }
 
       final snap = await q.orderBy(def.dateField).get();
+      var results = snap.docs.map((d) {
+        final data = Map<String, dynamic>.from(d.data() as Map);
+        data['_id'] = d.id;
+        return data;
+      }).toList();
+
+      // Req #3 (Education): the exam_forms collection itself doesn't store
+      // caste/gender, so pull each student's profile once (deduped by
+      // studentId) to make Caste/Gender filtering possible on this report.
+      if (_reportType == 'exam_form') {
+        final cache = <String, Map<String, String>>{};
+        for (final r in results) {
+          final sid = (r['studentId'] ?? '').toString();
+          if (sid.isEmpty) continue;
+          if (!cache.containsKey(sid)) {
+            final user = await _userSvc.getUser(sid);
+            cache[sid] = {
+              'gender': user?.gender ?? '',
+              'casteCategory': user?.actualCasteCategory ?? '',
+            };
+          }
+          r['gender'] = cache[sid]!['gender'];
+          r['casteCategory'] = cache[sid]!['casteCategory'];
+        }
+      }
+
       setState(() {
-        _results = snap.docs.map((d) {
-          final data = Map<String, dynamic>.from(d.data() as Map);
-          data['_id'] = d.id;
-          return data;
-        }).toList();
+        _results = results;
       });
     } catch (e) {
       if (mounted) {
@@ -83,15 +146,17 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
     }
   }
 
+
   Future<void> _generateReport() async {
-    if (_results.isEmpty) return;
+    final results = _filteredResults;
+    if (results.isEmpty) return;
     setState(() => _generating = true);
     try {
       final typeName = _types[_reportType]!.label;
       final monthYear = '${_months[_selectedMonth - 1]} $_selectedYear';
       final studentFilter = _studentIdCtrl.text.trim();
       final now = DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now());
-      final columns = _columnsFor(_reportType);
+      final columns = _columnsFor(_reportType, results);
 
       final headerRow = TableRow(
         decoration: BoxDecoration(color: Colors.grey.shade200),
@@ -102,7 +167,7 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
                 ))
             .toList(),
       );
-      final dataRows = _results
+      final dataRows = results
           .map((row) => TableRow(
                 children: columns
                     .map((c) => Padding(
@@ -135,7 +200,7 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
                 Text('Generated: $now', style: TextStyle(fontSize: 9, color: Colors.grey.shade600)),
                 if (studentFilter.isNotEmpty)
                   Text('Student ID: $studentFilter', style: TextStyle(fontSize: 9, color: Colors.grey.shade600)),
-                Text('Total Records: ${_results.length}', style: TextStyle(fontSize: 9, color: Colors.grey.shade600)),
+                Text('Total Records: ${results.length}', style: TextStyle(fontSize: 9, color: Colors.grey.shade600)),
               ],
             ),
             const SizedBox(height: 8),
@@ -172,11 +237,11 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
     }
   }
 
-  List<_Col> _columnsFor(String type) {
+  List<_Col> _columnsFor(String type, List<Map<String, dynamic>> rows) {
     switch (type) {
       case 'bonafide':
         return [
-          _Col('#', 0.4, (r) => ((_results.indexOf(r)) + 1).toString()),
+          _Col('#', 0.4, (r) => ((rows.indexOf(r)) + 1).toString()),
           _Col('Student ID', 1.2, (r) => r['erpId'] ?? '—'),
           _Col('Name', 1.4, (r) => r['studentName'] ?? '—'),
           _Col('Branch', 1.2, (r) => r['branch'] ?? '—'),
@@ -187,7 +252,7 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
         ];
       case 'character':
         return [
-          _Col('#', 0.4, (r) => ((_results.indexOf(r)) + 1).toString()),
+          _Col('#', 0.4, (r) => ((rows.indexOf(r)) + 1).toString()),
           _Col('Student ID', 1.2, (r) => r['erpId'] ?? '—'),
           _Col('Name', 1.4, (r) => r['studentName'] ?? '—'),
           _Col('Branch', 1.2, (r) => r['branch'] ?? '—'),
@@ -198,7 +263,7 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
         ];
       case 'transfer':
         return [
-          _Col('#', 0.4, (r) => ((_results.indexOf(r)) + 1).toString()),
+          _Col('#', 0.4, (r) => ((rows.indexOf(r)) + 1).toString()),
           _Col('Student ID', 1.2, (r) => r['erpId'] ?? '—'),
           _Col('Name', 1.4, (r) => r['studentName'] ?? '—'),
           _Col('Branch', 1.2, (r) => r['branch'] ?? '—'),
@@ -209,10 +274,13 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
         ];
       case 'exam_form':
         return [
-          _Col('#', 0.4, (r) => ((_results.indexOf(r)) + 1).toString()),
+          _Col('#', 0.4, (r) => ((rows.indexOf(r)) + 1).toString()),
           _Col('Student ID', 1.2, (r) => r['erpId'] ?? '—'),
           _Col('Branch', 1.1, (r) => r['branch'] ?? '—'),
+          _Col('Year', 0.6, (r) => r['year'] ?? '—'),
           _Col('Sem', 0.7, (r) => r['semester'] ?? '—'),
+          _Col('Caste', 0.8, (r) => r['casteCategory'] ?? '—'),
+          _Col('Gender', 0.7, (r) => r['gender'] ?? '—'),
           _Col('Exam Month', 1.0, (r) => '${r['examMonth'] ?? ''} ${r['examYear'] ?? ''}'),
           _Col('Subjects', 1.4, (r) {
             final subs = r['subjects'];
@@ -225,7 +293,7 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
       case 'scholarship':
       default:
         return [
-          _Col('#', 0.4, (r) => ((_results.indexOf(r)) + 1).toString()),
+          _Col('#', 0.4, (r) => ((rows.indexOf(r)) + 1).toString()),
           _Col('Student ID', 1.2, (r) => r['erpId'] ?? '—'),
           _Col('Name', 1.2, (r) => r['studentName'] ?? '—'),
           _Col('Scholarship', 1.4, (r) => r['scholarshipName'] ?? '—'),
@@ -278,7 +346,7 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
         title: const Text('Monthly Reports'),
         backgroundColor: const Color(0xFF7C3AED),
         actions: [
-          if (_results.isNotEmpty)
+          if (_filteredResults.isNotEmpty)
             IconButton(
               icon: _generating
                   ? const SizedBox(
@@ -395,21 +463,123 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
                     ),
                   ),
                 ),
+                // Req #3 (Education): refine the fetched Exam Form records
+                // by academic Year / Semester / Caste / Gender. Options
+                // reflect exactly what's present in the fetched batch.
+                if (_reportType == 'exam_form' && _results.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  const Divider(),
+                  const Text('Refine by',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _filterYear,
+                          isDense: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Year',
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          ),
+                          hint: const Text('All', style: TextStyle(fontSize: 13)),
+                          items: _distinctValues('year')
+                              .map((v) => DropdownMenuItem(value: v, child: Text(v, style: const TextStyle(fontSize: 13))))
+                              .toList(),
+                          onChanged: (v) => setState(() => _filterYear = v),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _filterSemester,
+                          isDense: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Semester',
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          ),
+                          hint: const Text('All', style: TextStyle(fontSize: 13)),
+                          items: _distinctValues('semester')
+                              .map((v) => DropdownMenuItem(value: v, child: Text(v, style: const TextStyle(fontSize: 13))))
+                              .toList(),
+                          onChanged: (v) => setState(() => _filterSemester = v),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _filterCaste,
+                          isDense: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Caste',
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          ),
+                          hint: const Text('All', style: TextStyle(fontSize: 13)),
+                          // Req: always list every caste category — even ones
+                          // no student in this batch applied under — so staff
+                          // can pick any of them; it just returns zero rows.
+                          items: AcademicData.actualCasteCategories
+                              .map((v) => DropdownMenuItem(value: v, child: Text(v, style: const TextStyle(fontSize: 13))))
+                              .toList(),
+                          onChanged: (v) => setState(() => _filterCaste = v),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _filterGender,
+                          isDense: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Gender',
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          ),
+                          hint: const Text('All', style: TextStyle(fontSize: 13)),
+                          items: _distinctValues('gender')
+                              .map((v) => DropdownMenuItem(value: v, child: Text(v, style: const TextStyle(fontSize: 13))))
+                              .toList(),
+                          onChanged: (v) => setState(() => _filterGender = v),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_filterYear != null || _filterSemester != null || _filterCaste != null || _filterGender != null) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: () => setState(_resetExamFormFilters),
+                        icon: const Icon(Icons.clear, size: 16),
+                        label: const Text('Clear filters'),
+                      ),
+                    ),
+                  ],
+                ],
               ],
             ),
           ),
 
           // ── Results ─────────────────────────────────────────
-          if (_results.isNotEmpty) ...[
+          if (_filteredResults.isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
               child: Row(
                 children: [
-                  Text(
-                    '$typeName — ${_months[_selectedMonth - 1]} $_selectedYear',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  Expanded(
+                    child: Text(
+                      '$typeName — ${_months[_selectedMonth - 1]} $_selectedYear',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
@@ -417,7 +587,7 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      '${_results.length} records',
+                      '${_filteredResults.length} records',
                       style: const TextStyle(
                         color: Color(0xFF7C3AED),
                         fontWeight: FontWeight.bold,
@@ -448,11 +618,26 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
                           ],
                         ),
                       )
+                    : _filteredResults.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.filter_alt_off_outlined,
+                                    size: 56, color: Colors.grey[300]),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No records match the selected filters.',
+                                  style: TextStyle(color: Colors.grey[500]),
+                                ),
+                              ],
+                            ),
+                          )
                     : ListView.builder(
                         padding: const EdgeInsets.fromLTRB(12, 4, 12, 80),
-                        itemCount: _results.length,
+                        itemCount: _filteredResults.length,
                         itemBuilder: (_, i) {
-                          final r = _results[i];
+                          final r = _filteredResults[i];
                           final status = r['status'] ?? '';
                           final erpId = r['erpId'] ?? '—';
                           final name = r['studentName'] ?? r['name'] ?? '—';
@@ -505,7 +690,7 @@ class _MonthlyReportScreenState extends State<MonthlyReportScreen> {
           ),
         ],
       ),
-      floatingActionButton: _results.isNotEmpty
+      floatingActionButton: _filteredResults.isNotEmpty
           ? FloatingActionButton.extended(
               onPressed: _generating ? null : _generateReport,
               backgroundColor: const Color(0xFF7C3AED),

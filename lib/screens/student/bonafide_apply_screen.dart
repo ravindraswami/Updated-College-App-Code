@@ -314,6 +314,7 @@ class _BonafideFormScreenState extends State<_BonafideFormScreen> {
         rollNo: widget.student.registerNo,
         purpose: _purposeCtrl.text.trim(),
         charges: _charges,
+        admissionDate: widget.student.admissionDate,
       );
       if (!mounted) return;
       // Navigate to PaymentScreen with real SBI link

@@ -188,7 +188,7 @@ class _HomeTab extends StatelessWidget {
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Your uploaded files are visible only to the Principal.',
+                          'Your uploaded files are visible only to the Dean.',
                           style: TextStyle(color: Colors.white70, fontSize: 12),
                         ),
                       ),
@@ -269,7 +269,7 @@ class _UploadTabState extends State<_UploadTab> {
       );
       setState(() => _progress = 1.0);
       _snack(
-        'File uploaded successfully. Principal can now view it.',
+        'File uploaded successfully. Dean can now view it.',
         isError: false,
       );
       setState(() {
@@ -305,12 +305,12 @@ class _UploadTabState extends State<_UploadTab> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Upload File for Principal',
+            'Upload File for Dean',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
           const SizedBox(height: 4),
           const Text(
-            'Your file will be visible only to the Principal.',
+            'Your file will be visible only to the Dean.',
             style: TextStyle(color: Colors.grey, fontSize: 12),
           ),
           const SizedBox(height: 20),
@@ -392,8 +392,8 @@ class _UploadTabState extends State<_UploadTab> {
             const SizedBox(height: 16),
             Row(
               children: [
-                const Text('Uploading...'),
-                const Spacer(),
+                const Flexible(child: Text('Uploading...', overflow: TextOverflow.ellipsis)),
+                const SizedBox(width: 8),
                 Text(
                   '${(_progress * 100).toInt()}%',
                   style: const TextStyle(
@@ -431,7 +431,7 @@ class _UploadTabState extends State<_UploadTab> {
                       ),
                     )
                   : const Icon(Icons.upload),
-              label: Text(_uploading ? 'Uploading...' : 'Upload to Principal'),
+              label: Text(_uploading ? 'Uploading...' : 'Upload to Dean'),
             ),
           ),
         ],
@@ -457,7 +457,7 @@ class _MyFilesTab extends StatelessWidget {
         if (files.isEmpty) {
           return const EmptyWidget(
             message:
-                'No files uploaded yet.\nUse the Upload tab to send files to the Principal.',
+                'No files uploaded yet.\nUse the Upload tab to send files to the Dean.',
             icon: Icons.folder_outlined,
           );
         }
@@ -472,7 +472,7 @@ class _MyFilesTab extends StatelessWidget {
   }
 }
 
-// ── File card (reused in both NT and Principal dashboards) ────
+// ── File card (reused in both NT and Dean dashboards) ────
 class NtFileCard extends StatelessWidget {
   final NtFileModel file;
   final NtFileService svc;

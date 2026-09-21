@@ -1,23 +1,24 @@
 import 'package:flutter/material.dart';
-import '../../models/character_cert_model.dart';
-import '../../services/character_cert_service.dart';
+import '../../models/bonafide_model.dart';
+import '../../services/bonafide_service.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/academic_data.dart';
 import '../../utils/certificate_widgets.dart' as cert;
 import '../shared/certificate_preview_screen.dart';
 
-/// Education Section: full edit form for a Character Certificate request.
+/// Education Section: full edit form for a Bonafide Certificate request.
 /// Every field can be corrected here before the certificate image is
-/// generated — mirrors TcEditScreen / BonafideEditScreen.
-class CharacterCertEditScreen extends StatefulWidget {
-  final CharacterCertModel cert;
-  const CharacterCertEditScreen({super.key, required this.cert});
+/// generated — mirrors TcEditScreen / CharacterCertEditScreen.
+class BonafideEditScreen extends StatefulWidget {
+  final BonafideModel bonafide;
+  const BonafideEditScreen({super.key, required this.bonafide});
 
   @override
-  State<CharacterCertEditScreen> createState() => _CharacterCertEditScreenState();
+  State<BonafideEditScreen> createState() => _BonafideEditScreenState();
 }
 
-class _CharacterCertEditScreenState extends State<CharacterCertEditScreen> {
-  final _svc = CharacterCertService();
+class _BonafideEditScreenState extends State<BonafideEditScreen> {
+  final _svc = BonafideService();
   final _formKey = GlobalKey<FormState>();
   bool _saving = false;
   late final Map<String, TextEditingController> _c;
@@ -25,17 +26,20 @@ class _CharacterCertEditScreenState extends State<CharacterCertEditScreen> {
   @override
   void initState() {
     super.initState();
-    final c = widget.cert;
+    final b = widget.bonafide;
     _c = {
-      'studentName': TextEditingController(text: c.studentName),
-      'erpId': TextEditingController(text: c.erpId),
-      'branch': TextEditingController(text: c.branch),
-      'year': TextEditingController(text: c.year),
-      'semester': TextEditingController(text: c.semester),
-      'rollNo': TextEditingController(text: c.rollNo),
-      'dob': TextEditingController(text: c.dob),
-      'conductRemark': TextEditingController(text: c.conductRemark),
-      'purpose': TextEditingController(text: c.purpose),
+      'studentName': TextEditingController(text: b.studentName),
+      'erpId': TextEditingController(text: b.erpId),
+      'branch': TextEditingController(text: b.branch),
+      'year': TextEditingController(text: b.year),
+      'semester': TextEditingController(text: b.semester),
+      'rollNo': TextEditingController(text: b.rollNo),
+      'purpose': TextEditingController(text: b.purpose),
+      'academicYear': TextEditingController(
+        text: b.academicYear.isNotEmpty
+            ? b.academicYear
+            : AcademicData.defaultAcademicYearFor(admissionDate: '', yearId: b.year),
+      ),
     };
   }
 
@@ -47,27 +51,30 @@ class _CharacterCertEditScreenState extends State<CharacterCertEditScreen> {
     super.dispose();
   }
 
-  CharacterCertModel _buildUpdatedModel() {
-    final c = widget.cert;
-    return CharacterCertModel(
-      id: c.id,
-      studentId: c.studentId,
+  BonafideModel _buildUpdatedModel() {
+    final b = widget.bonafide;
+    return BonafideModel(
+      id: b.id,
+      studentId: b.studentId,
       studentName: _c['studentName']!.text.trim(),
       erpId: _c['erpId']!.text.trim(),
       branch: _c['branch']!.text.trim(),
       year: _c['year']!.text.trim(),
       semester: _c['semester']!.text.trim(),
       rollNo: _c['rollNo']!.text.trim(),
-      dob: _c['dob']!.text.trim(),
-      conductRemark: _c['conductRemark']!.text.trim(),
       purpose: _c['purpose']!.text.trim(),
-      status: c.status,
-      isPaid: c.isPaid,
-      charges: c.charges,
-      paymentId: c.paymentId,
-      approvedBy: c.approvedBy,
-      approvedDate: c.approvedDate,
-      createdAt: c.createdAt,
+      applyDate: b.applyDate,
+      status: b.status,
+      isPaid: b.isPaid,
+      paymentId: b.paymentId,
+      paymentDate: b.paymentDate,
+      paymentScreenshotUrl: b.paymentScreenshotUrl,
+      charges: b.charges,
+      approvedBy: b.approvedBy,
+      approvedDate: b.approvedDate,
+      pdfUrl: b.pdfUrl,
+      createdAt: b.createdAt,
+      academicYear: _c['academicYear']!.text.trim(),
     );
   }
 
@@ -76,20 +83,20 @@ class _CharacterCertEditScreenState extends State<CharacterCertEditScreen> {
     setState(() => _saving = true);
     try {
       final updated = _buildUpdatedModel();
-      await _svc.updateCert(updated);
+      await _svc.updateBonafide(updated);
       if (!mounted) return;
       if (andGenerate) {
         await openCertificatePreview(
           context,
-          title: 'Character Certificate',
-          fileName: 'CharacterCert_${updated.studentName.replaceAll(' ', '_')}',
-          certificate: cert.buildCharacterCertCertificate(updated),
+          title: 'Bonafide Certificate',
+          fileName: 'Bonafide_${updated.studentName.replaceAll(' ', '_')}',
+          certificate: cert.buildBonafideCertificate(updated),
         );
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(andGenerate ? 'Saved and certificate generated.' : 'Character certificate details saved.'),
+          content: Text(andGenerate ? 'Saved and certificate generated.' : 'Bonafide details saved.'),
           backgroundColor: AppTheme.success,
         ),
       );
@@ -125,8 +132,8 @@ class _CharacterCertEditScreenState extends State<CharacterCertEditScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Edit Character Certificate'),
-        backgroundColor: const Color(0xFFB45309),
+        title: const Text('Edit Bonafide Certificate'),
+        backgroundColor: const Color(0xFF7C3AED),
       ),
       body: Form(
         key: _formKey,
@@ -144,9 +151,8 @@ class _CharacterCertEditScreenState extends State<CharacterCertEditScreen> {
               _field('branch', 'Branch'),
               _field('year', 'Year'),
               _field('semester', 'Semester'),
-              _field('dob', 'Date of Birth'),
-              _field('conductRemark', 'Conduct Remark'),
               _field('purpose', 'Purpose', maxLines: 2),
+              _field('academicYear', 'Academic Year (During the Year) — e.g. 2024-25'),
               const SizedBox(height: 20),
               Row(
                 children: [
