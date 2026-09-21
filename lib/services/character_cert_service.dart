@@ -76,6 +76,12 @@ class CharacterCertService {
         });
   }
 
+  // Education Section: edit any field on a Character Certificate request
+  // before/while approving, then save — mirrors TcService.updateTc.
+  Future<void> updateCert(CharacterCertModel c) async {
+    await _db.collection(_col).doc(c.id).update(c.toMap());
+  }
+
   // Technical: approve
   Future<void> approveCert(String certId, String approverUid) async {
     await _db.collection(_col).doc(certId).update({

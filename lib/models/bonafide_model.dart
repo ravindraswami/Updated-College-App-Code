@@ -19,6 +19,11 @@ class BonafideModel {
   final String approvedDate;
   final String pdfUrl;
   final DateTime createdAt;
+  // Req #5: "during the academic year" text shown on the printed
+  // certificate. Defaults to the student's current academic year at
+  // request time (kept in sync with their profile), and can be
+  // corrected by Education staff via BonafideEditScreen.
+  final String academicYear;
 
   BonafideModel({
     required this.id,
@@ -41,6 +46,7 @@ class BonafideModel {
     this.approvedDate = '',
     this.pdfUrl = '',
     required this.createdAt,
+    this.academicYear = '',
   });
 
   factory BonafideModel.fromMap(Map<String, dynamic> map, String id) =>
@@ -65,6 +71,7 @@ class BonafideModel {
         approvedDate: map['approvedDate'] ?? '',
         pdfUrl: map['pdfUrl'] ?? '',
         createdAt: (map['createdAt'] as dynamic)?.toDate() ?? DateTime.now(),
+        academicYear: map['academicYear'] ?? '',
       );
 
   Map<String, dynamic> toMap() => {
@@ -87,6 +94,7 @@ class BonafideModel {
     'approvedDate': approvedDate,
     'pdfUrl': pdfUrl,
     'createdAt': createdAt,
+    'academicYear': academicYear,
   };
 
   static String statusLabel(String status) {

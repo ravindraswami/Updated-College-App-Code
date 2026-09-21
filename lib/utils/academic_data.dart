@@ -1,6 +1,29 @@
 /// All academic branch / year / semester data
 /// Maharashtra state - India specific data
 class AcademicData {
+  // ── Req #5: "during the academic year" default for Bonafide /
+  // Character Certificate requests, computed from the student's own
+  // profile (admission date + current year-level) instead of a bare
+  // "last calendar year → this year" guess. Falls back to that guess
+  // when the admission date can't be parsed.
+  static String defaultAcademicYearFor({
+    required String admissionDate,
+    required String yearId,
+  }) {
+    const yearOffset = {'FY': 0, 'SY': 1, 'TY': 2, 'LY': 3};
+    final offset = yearOffset[yearId] ?? 0;
+
+    int? admissionYear;
+    final parts = admissionDate.split(RegExp(r'[/-]'));
+    if (parts.length == 3) {
+      admissionYear = int.tryParse(parts[2].length == 4 ? parts[2] : parts[0]);
+    }
+
+    final today = DateTime.now();
+    final startYear = admissionYear != null ? admissionYear + offset : today.year - 1;
+    return '$startYear-${((startYear + 1) % 100).toString().padLeft(2, '0')}';
+  }
+
   // ── Branches ─────────────────────────────────────────────
   static const List<Map<String, dynamic>> branches = [
     {
@@ -210,6 +233,7 @@ class AcademicData {
     'OPEN',
     'EWS',
     'SEBC',
+    'Other',
   ];
 
   static const List<String> admittedCasteCategories = [
@@ -226,6 +250,7 @@ class AcademicData {
     'SEBC',
     'CR',
     'CO',
+    'Other',
   ];
 
   static const List<String> otherCategories = [

@@ -2,12 +2,24 @@ import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+
+// Play Store / production-security note: debugPrint still executes (and
+// is readable via `adb logcat`) in a release build, not just in debug —
+// it only throttles output, it does not strip it. Logging things like
+// FCM tokens or userIds in release builds is exactly the kind of leak
+// Play Store data-safety reviews flag. This helper makes every log in
+// this file a no-op outside of `flutter run` debug builds, with zero
+// change to behavior otherwise.
+void _log(String message) {
+  if (kDebugMode) debugPrint(message);
+}
 
 // Background message handler — MUST be top-level function
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  debugPrint('Background message: ${message.messageId}');
+  _log('Background message: ${message.messageId}');
 }
 
 class NotificationService {
@@ -50,7 +62,7 @@ class NotificationService {
       _handleNotificationNavigation(message.data);
     });
 
-    debugPrint('[FCM] ✅ App-level init complete');
+    _log('[FCM] ✅ App-level init complete');
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -58,7 +70,7 @@ class NotificationService {
   // Generates and saves the FCM token
   // ═══════════════════════════════════════════════════════════
   Future<void> initializeForUser(String userId) async {
-    debugPrint('[FCM] ▶ initializeForUser called for: $userId');
+    _log('[FCM] ▶ initializeForUser called for: $userId');
 
     try {
       // Request permission
@@ -70,10 +82,10 @@ class NotificationService {
       );
 
       final status = settings.authorizationStatus;
-      debugPrint('[FCM] Permission status: $status');
+      _log('[FCM] Permission status: $status');
 
       if (status == AuthorizationStatus.denied) {
-        debugPrint('[FCM] ❌ Permission DENIED');
+        _log('[FCM] ❌ Permission DENIED');
         return;
       }
 
@@ -81,14 +93,14 @@ class NotificationService {
       String? token;
       try {
         token = await _fcm.getToken();
-        debugPrint('[FCM] Token: ${token?.substring(0, 20)}...');
+        _log('[FCM] Token acquired (${token?.length ?? 0} chars).');
       } catch (e) {
-        debugPrint('[FCM] ❌ getToken() failed: $e');
+        _log('[FCM] ❌ getToken() failed: $e');
         return;
       }
 
       if (token == null || token.isEmpty) {
-        debugPrint('[FCM] ❌ Token is null/empty');
+        _log('[FCM] ❌ Token is null/empty');
         return;
       }
 
@@ -96,11 +108,11 @@ class NotificationService {
       await _db.collection('users').doc(userId).set({
         'fcmToken': token,
       }, SetOptions(merge: true));
-      debugPrint('[FCM] ✅ Token saved');
+      _log('[FCM] ✅ Token saved');
 
       // Listen for token refresh
       _fcm.onTokenRefresh.listen((newToken) {
-        debugPrint('[FCM] Token refreshed');
+        _log('[FCM] Token refreshed');
         _db.collection('users').doc(userId).set({
           'fcmToken': newToken,
         }, SetOptions(merge: true));
@@ -109,15 +121,15 @@ class NotificationService {
       // Check initial message (app opened from notification - terminated state)
       final initial = await _fcm.getInitialMessage();
       if (initial != null) {
-        debugPrint('[FCM] App opened from killed notification');
+        _log('[FCM] App opened from killed notification');
         await Future.delayed(const Duration(milliseconds: 800));
         _handleNotificationNavigation(initial.data);
       }
 
-      debugPrint('[FCM] ✅ User init complete');
+      _log('[FCM] ✅ User init complete');
     } catch (e, stack) {
-      debugPrint('[FCM] ❌ initializeForUser error: $e');
-      debugPrint(stack.toString());
+      _log('[FCM] ❌ initializeForUser error: $e');
+      _log(stack.toString());
     }
   }
 
@@ -130,9 +142,9 @@ class NotificationService {
         'fcmToken': '',
       }, SetOptions(merge: true));
       await _fcm.deleteToken();
-      debugPrint('[FCM] ✅ Token cleared on logout');
+      _log('[FCM] ✅ Token cleared on logout');
     } catch (e) {
-      debugPrint('[FCM] clearToken error: $e');
+      _log('[FCM] clearToken error: $e');
     }
   }
 
@@ -176,7 +188,7 @@ class NotificationService {
             );
       }
     } catch (e) {
-      debugPrint('[FCM] Setup error: $e');
+      _log('[FCM] Setup error: $e');
     }
   }
 
@@ -212,7 +224,7 @@ class NotificationService {
         payload: _encodePayload(message.data),
       );
     } catch (e) {
-      debugPrint('[FCM] Show error: $e');
+      _log('[FCM] Show error: $e');
     }
   }
 
@@ -249,7 +261,7 @@ class NotificationService {
         break;
 
       default:
-        debugPrint('[FCM] Unknown type: $type');
+        _log('[FCM] Unknown type: $type');
     }
   }
 

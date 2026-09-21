@@ -1,25 +1,29 @@
-/// Hardcoded Principal accounts.
-/// These are seeded into Firebase on first app launch.
-/// Share these credentials with your Principal privately.
+/// Hardcoded Dean account(s).
+/// These are seeded into Firebase automatically every time the app
+/// launches (see AuthService.seedPrincipalAccounts, called from
+/// main.dart) — safe to run every time, it checks first and only
+/// creates what's missing. It also self-heals if you ever clear the
+/// Firestore "users" collection but the Firebase Auth account survives.
+/// Share these credentials with your Dean privately.
 ///
-/// To add/change: edit this list and re-run seedPrincipalAccounts()
-/// from main.dart once, then remove the call.
+/// To add/change an account: just edit this list — no need to remove
+/// the seeding call afterwards, it's safe to leave it running forever.
 class PrincipalConfig {
 
   static const List<Map<String, String>> principals = [
     {
       'name':       'Dr. Suraj Mole',
-      'email':      'principal@smarterp.app',
-      'password':   'Principal@2026',   // share this privately
+      'email':      'dean@smarterp.app',
+      'password':   'Dean@2026',   // share this privately
       'department': 'Administration',
       'phone':      '9800000001',
-      'erpId':      'PRINADMIN2026001',
+      'erpId':      'DEANADMIN2026001',
     },
-    // Add more principals here if needed:
+    // Add more Dean accounts here if needed:
     // {
     //   'name':  'Dr. Sunita Patil',
-    //   'email': 'principal2@smarterp.app',
-    //   'password': 'Principal@2026B',
+    //   'email': 'dean2@smarterp.app',
+    //   'password': 'Dean@2026B',
     //   ...
     // },
   ];

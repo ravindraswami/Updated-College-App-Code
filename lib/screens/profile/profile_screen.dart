@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../utils/app_theme.dart';
@@ -19,6 +20,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _isEditing = false;
   bool _isSaving = false;
+  bool _isDeletingAccount = false;
   final _authService = AuthService();
 
   // Editable controllers — only fields allowed to edit post-registration
@@ -30,9 +32,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _taluka;
   String? _village;
   String _hostelFacility = 'No';
-  // Staff editable
+  // Staff editable — every field except role can be edited by the staff
+  // member themselves.
   late TextEditingController _nameCtrl;
   late TextEditingController _phoneCtrl;
+  late TextEditingController _departmentCtrl;
 
   @override
   void initState() {
@@ -49,6 +53,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         : 'No';
     _nameCtrl = TextEditingController(text: widget.user.name);
     _phoneCtrl = TextEditingController(text: widget.user.phone);
+    _departmentCtrl = TextEditingController(text: widget.user.department);
   }
 
   @override
@@ -58,6 +63,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _addressCtrl.dispose();
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
+    _departmentCtrl.dispose();
     super.dispose();
   }
 
@@ -75,9 +81,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (_village != null) data['village'] = _village;
         data['hostelFacility'] = _hostelFacility;
       } else {
+        // Staff can edit every field on their own profile except role.
         data['name'] = _nameCtrl.text.trim();
         data['phone'] = _phoneCtrl.text.trim();
         data['address'] = _addressCtrl.text.trim();
+        data['department'] = _departmentCtrl.text.trim();
       }
       await _authService.updateProfile(widget.user.id, data);
       if (!mounted) return;
@@ -97,6 +105,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     } finally {
       if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _confirmDeleteOwnAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Your Account?'),
+        content: const Text(
+          'This permanently deletes your Dean account and profile — '
+          'there is no undo. You will be signed out immediately.\n\n'
+          'Are you sure you want to continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.error),
+            child: const Text('Delete Account'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _isDeletingAccount = true);
+    try {
+      await _authService.deleteOwnAccount();
+      if (!mounted) return;
+      // Account + profile are gone — send back to the login screen and
+      // clear the whole navigation stack behind it.
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _isDeletingAccount = false);
+      final msg = e.code == 'requires-recent-login'
+          ? 'For security, please log out and log back in, then try deleting your account again.'
+          : 'Could not delete account: ${e.message ?? e.code}';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: AppTheme.error, duration: const Duration(seconds: 6)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isDeletingAccount = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not delete account: $e'), backgroundColor: AppTheme.error),
+      );
     }
   }
 
@@ -407,7 +465,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ? widget.user.phone
                                   : '—',
                             ),
-                      _row('Department', widget.user.department),
+                      _isEditing
+                          ? _editField(
+                              _departmentCtrl,
+                              'Department',
+                              Icons.apartment_outlined,
+                            )
+                          : _row('Department', widget.user.department),
                       _row('ERP ID', widget.user.erpId),
                       _row(
                         'Status',
@@ -437,8 +501,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 20),
 
                 // Legal links
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     TextButton(
                       onPressed: () => Navigator.push(
@@ -489,6 +554,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                   ),
+
+                // Dean: delete own account. Only the Dean sees this —
+                // every other role is managed by the Dean/Incharge
+                // instead of deleting themselves.
+                if (widget.user.role == 'dean' || widget.user.role == 'principal') ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _isDeletingAccount ? null : _confirmDeleteOwnAccount,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.error,
+                        side: const BorderSide(color: AppTheme.error),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      icon: _isDeletingAccount
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.delete_forever_outlined),
+                      label: Text(
+                        _isDeletingAccount ? 'Deleting…' : 'Delete My Account',
+                        style: const TextStyle(fontSize: 15),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 24),
               ],
             ),

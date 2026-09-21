@@ -4,12 +4,13 @@ import '../../services/notification_service.dart';
 import '../../utils/app_theme.dart';
 import '../auth/register_screen.dart';
 import '../student/student_dashboard.dart';
-import '../professor/professor_dashboard.dart';
-import '../coordinator/coordinator_dashboard.dart';
-import '../hod/hod_dashboard.dart';
-import '../principal/principal_dashboard.dart';
-import '../technical/technical_dashboard.dart';
+import '../course_teacher/course_teacher_dashboard.dart';
+import '../advisor/advisor_dashboard.dart';
+import '../incharge/incharge_dashboard.dart';
+import '../dean/dean_dashboard.dart';
+import '../education/education_dashboard.dart';
 import '../non_technical/non_technical_dashboard.dart';
+import '../scholarship/scholarship_dashboard.dart';
 import '../legal/legal_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -48,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
               : 'Your registration is pending approval. Please wait for your coordinator to assign a class.';
         } else {
           pendingMsg =
-              'Your account is awaiting approval from the Incharge or Principal. You will be notified once approved.';
+              'Your account is awaiting approval from the Incharge or Dean. You will be notified once approved.';
         }
         _showMessage(pendingMsg, isError: false);
         await _auth.logout();
@@ -79,25 +80,32 @@ class _LoginScreenState extends State<LoginScreen> {
   void _navigateByRole(String role) {
     Widget screen;
     switch (role) {
-      case 'professor':
-        screen = const ProfessorDashboard();
+      case 'course_teacher':
+      case 'professor': // legacy role key — old accounts only
+        screen = const CourseTeacherDashboard();
         break;
-      case 'coordinator':
-        screen = const CoordinatorDashboard();
+      case 'advisor':
+      case 'coordinator': // legacy role key — old accounts only
+        screen = const AdvisorDashboard();
         break;
       case 'ug_incharge':
       case 'pg_incharge':
       case 'hod':
-        screen = const HodDashboard();
+        screen = const InchargeDashboard();
         break;
-      case 'principal':
-        screen = const PrincipalDashboard();
+      case 'dean':
+      case 'principal': // legacy role key — old accounts only
+        screen = const DeanDashboard();
         break;
-      case 'technical':
-        screen = const TechnicalDashboard();
+      case 'education':
+      case 'technical': // legacy role key — old accounts only
+        screen = const EducationDashboard();
         break;
       case 'non_technical':
         screen = const NonTechnicalDashboard();
+        break;
+      case 'scholarship':
+        screen = const ScholarshipDashboard();
         break;
       default:
         screen = const StudentDashboard();
@@ -216,8 +224,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     const Text("Don't have an account? "),
                     TextButton(
@@ -232,8 +241,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     TextButton(
                       onPressed: () => Navigator.push(

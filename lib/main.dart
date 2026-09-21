@@ -1,26 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'utils/app_theme.dart';
 import 'services/notification_service.dart';
 import 'services/auth_service.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/student/student_dashboard.dart';
-import 'screens/professor/professor_dashboard.dart';
-import 'screens/coordinator/coordinator_dashboard.dart';
-import 'screens/hod/hod_dashboard.dart';
-import 'screens/principal/principal_dashboard.dart';
-import 'screens/technical/technical_dashboard.dart';
+import 'screens/course_teacher/course_teacher_dashboard.dart';
+import 'screens/advisor/advisor_dashboard.dart';
+import 'screens/incharge/incharge_dashboard.dart';
+import 'screens/dean/dean_dashboard.dart';
+import 'screens/education/education_dashboard.dart';
 import 'screens/non_technical/non_technical_dashboard.dart';
+import 'screens/scholarship/scholarship_dashboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Seed hardcoded Principal accounts (skips if already exists)
-  try {
-    await AuthService().seedPrincipalAccounts();
-  } catch (_) {}
+  // Seed hardcoded Dean account (skips if already exists) — self-heals
+  // if you wiped the Firestore "users" collection but the Firebase Auth
+  // account still exists.
+  //
+  // IMPORTANT: only do this when NO ONE is currently signed in.
+  // seedPrincipalAccounts() internally calls signInWithEmailAndPassword
+  // for the Dean account and then signOut()s again once done. If a
+  // student/staff session was already persisted from a previous app
+  // run, running this unconditionally on every launch would silently
+  // swap Firebase Auth's active session to Dean and then sign out of
+  // THAT — wiping the real logged-in user's session every single time
+  // the app is restarted (this was the "login doesn't stay, I get
+  // logged out again" bug). Since seeding only ever needs to happen
+  // once (or when signed out), skipping it while someone is already
+  // signed in fixes that without losing the self-heal behaviour.
+  if (FirebaseAuth.instance.currentUser == null) {
+    try {
+      await AuthService().seedPrincipalAccounts();
+    } catch (e) {
+      debugPrint('[seedPrincipalAccounts] top-level failure: $e');
+    }
+  }
 
   // Initialize FCM background handler
   await NotificationService().initializeApp();
@@ -79,20 +99,26 @@ class _NotifRouteState extends State<_NotifRoute> {
 
   Widget _homeForRole(String role, dynamic user) {
     switch (role) {
-      case 'professor':
-        return const ProfessorDashboard();
-      case 'coordinator':
-        return const CoordinatorDashboard();
+      case 'course_teacher':
+      case 'professor': // legacy role key — old accounts only
+        return const CourseTeacherDashboard();
+      case 'advisor':
+      case 'coordinator': // legacy role key — old accounts only
+        return const AdvisorDashboard();
       case 'ug_incharge':
       case 'pg_incharge':
       case 'hod':
-        return const HodDashboard();
-      case 'principal':
-        return const PrincipalDashboard();
-      case 'technical':
-        return const TechnicalDashboard();
+        return const InchargeDashboard();
+      case 'dean':
+      case 'principal': // legacy role key — old accounts only
+        return const DeanDashboard();
+      case 'education':
+      case 'technical': // legacy role key — old accounts only
+        return const EducationDashboard();
       case 'non_technical':
         return const NonTechnicalDashboard();
+      case 'scholarship':
+        return const ScholarshipDashboard();
       default:
         int tab = 0;
         if (widget.screen == 'exam_list') tab = 0;
@@ -136,25 +162,32 @@ class _SplashScreenState extends State<SplashScreen> {
     await NotificationService().initializeForUser(user.id);
     Widget home;
     switch (user.role) {
-      case 'professor':
-        home = const ProfessorDashboard();
+      case 'course_teacher':
+      case 'professor': // legacy role key — old accounts only
+        home = const CourseTeacherDashboard();
         break;
-      case 'coordinator':
-        home = const CoordinatorDashboard();
+      case 'advisor':
+      case 'coordinator': // legacy role key — old accounts only
+        home = const AdvisorDashboard();
         break;
       case 'ug_incharge':
       case 'pg_incharge':
       case 'hod':
-        home = const HodDashboard();
+        home = const InchargeDashboard();
         break;
-      case 'principal':
-        home = const PrincipalDashboard();
+      case 'dean':
+      case 'principal': // legacy role key — old accounts only
+        home = const DeanDashboard();
         break;
-      case 'technical':
-        home = const TechnicalDashboard();
+      case 'education':
+      case 'technical': // legacy role key — old accounts only
+        home = const EducationDashboard();
         break;
       case 'non_technical':
         home = const NonTechnicalDashboard();
+        break;
+      case 'scholarship':
+        home = const ScholarshipDashboard();
         break;
       default:
         home = const StudentDashboard();

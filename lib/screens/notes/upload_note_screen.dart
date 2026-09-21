@@ -431,11 +431,14 @@ class _UploadNoteScreenState extends State<UploadNoteScreen> {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  Text(
-                    'Uploading $_uploadedCount of ${_files.length}...',
-                    style: const TextStyle(fontSize: 13),
+                  Flexible(
+                    child: Text(
+                      'Uploading $_uploadedCount of ${_files.length}...',
+                      style: const TextStyle(fontSize: 13),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   Text(
                     '${(_progress * 100).toInt()}%',
                     style: const TextStyle(

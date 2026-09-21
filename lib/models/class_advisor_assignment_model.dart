@@ -2,6 +2,7 @@ class ClassAdvisorAssignmentModel {
   final String id;
   final String branch; // BIO-TECH-UG / BIO-TECH-PG
   final String year; // FY / SY / TY / LY
+  final String semester; // SEM-I, SEM-II, etc.
   final String regNoStart; // e.g. "001"
   final String regNoEnd; // e.g. "025"
   final String advisorId;
@@ -12,6 +13,7 @@ class ClassAdvisorAssignmentModel {
     required this.id,
     required this.branch,
     required this.year,
+    this.semester = '',
     required this.regNoStart,
     required this.regNoEnd,
     required this.advisorId,
@@ -27,6 +29,7 @@ class ClassAdvisorAssignmentModel {
       id: id,
       branch: map['branch'] ?? '',
       year: map['year'] ?? '',
+      semester: map['semester'] ?? '',
       regNoStart: map['regNoStart'] ?? '',
       regNoEnd: map['regNoEnd'] ?? '',
       advisorId: map['advisorId'] ?? '',
@@ -38,6 +41,7 @@ class ClassAdvisorAssignmentModel {
   Map<String, dynamic> toMap() => {
     'branch': branch,
     'year': year,
+    'semester': semester,
     'regNoStart': regNoStart,
     'regNoEnd': regNoEnd,
     'advisorId': advisorId,

@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import '../models/user_model.dart';
 import 'id_service.dart';
 import 'user_service.dart';
@@ -104,9 +105,11 @@ class AuthService {
         }
 
         // Use Incharge-assigned slotStart/slotEnd per coordinator for matching
+        // (whereIn matches both the new 'advisor' role key and the legacy
+        // 'coordinator' key, so this keeps working during/after migration).
         final coordSnap = await _firestore
             .collection('users')
-            .where('role', isEqualTo: 'coordinator')
+            .where('role', whereIn: ['advisor', 'coordinator'])
             .where('classId', isEqualTo: builtClassId)
             .get();
 
@@ -239,61 +242,110 @@ class AuthService {
     }
   }
 
-  // ── Seed hardcoded principal accounts ────────────────────
-  // Call this ONCE from main.dart on first launch only.
-  // After seeding, comment out the call to avoid re-seeding.
+  // ── Seed hardcoded Dean accounts ──────────────────────────
+  // Safe to call every app launch — it's idempotent (checks first).
+  //
+  // IMPORTANT FIX #2: this used to check Firestore FIRST (query
+  // `users` by email) before touching Firebase Auth at all. That read
+  // ran at app startup, before anyone is signed in — which the
+  // Firestore rules correctly reject (`allow read: if isSignedIn()`),
+  // since letting a signed-out client browse the `users` collection
+  // would be a real security hole. That's exactly why the Dean
+  // account stopped auto-appearing after the rules were published:
+  // this function's very first line was being silently denied.
+  //
+  // Fixed by flipping the order: always go through Firebase Auth
+  // FIRST (sign up, or sign in if it already exists — Auth itself
+  // doesn't need Firestore permissions), and only read/write Firestore
+  // AFTER that succeeds, once actually authenticated as that account.
+  //
+  // (Earlier fix, still true: if the Auth account survives but its
+  // Firestore doc was wiped, this recreates the missing doc instead of
+  // silently giving up.)
   Future<void> seedPrincipalAccounts() async {
     for (final p in PrincipalConfig.principals) {
       try {
-        // Check if already exists
-        final existing = await _firestore
-            .collection('users')
-            .where('email', isEqualTo: p['email'])
-            .limit(1)
-            .get();
-        if (existing.docs.isNotEmpty) {
-          // Already seeded — update isApproved just in case
-          await _firestore
-              .collection('users')
-              .doc(existing.docs.first.id)
-              .update({'isApproved': true});
-          continue;
+        String uid;
+        try {
+          // Try creating a fresh Auth account first — this never needs
+          // any Firestore permission, only Firebase Auth itself.
+          final credential = await _auth.createUserWithEmailAndPassword(
+            email: p['email']!,
+            password: p['password']!,
+          );
+          uid = credential.user!.uid;
+        } on FirebaseAuthException catch (authErr) {
+          if (authErr.code == 'email-already-in-use') {
+            // Already exists — sign in to get the uid. Also doesn't
+            // need any Firestore permission.
+            final credential = await _auth.signInWithEmailAndPassword(
+              email: p['email']!,
+              password: p['password']!,
+            );
+            uid = credential.user!.uid;
+          } else {
+            rethrow;
+          }
         }
 
-        // Create Firebase Auth account
-        final credential = await _auth.createUserWithEmailAndPassword(
-          email: p['email']!,
-          password: p['password']!,
-        );
-        final uid = credential.user!.uid;
+        // From here on we ARE signed in as this account, so Firestore
+        // rules (isSignedIn() / isOwner(uid)) allow reading and
+        // creating this exact doc.
+        final doc = await _firestore.collection('users').doc(uid).get();
+        if (!doc.exists) {
+          await _firestore.collection('users').doc(uid).set({
+            'erpId': p['erpId'],
+            'name': p['name'],
+            'email': p['email'],
+            'role': 'dean',
+            'department': p['department'] ?? 'Administration',
+            'year': DateTime.now().year.toString(),
+            'phone': p['phone'] ?? '',
+            'address': '',
+            'photoUrl': '',
+            'fcmToken': '',
+            'isApproved': true, // Dean is always pre-approved
+            'classId': '',
+            'classLabel': '',
+            'coordinatorId': '',
+            'createdAt': DateTime.now(),
+          });
+        } else if (doc.data()?['isApproved'] != true || doc.data()?['role'] != 'dean') {
+          // Doc already exists — just make sure it's still marked
+          // approved and on the current role key.
+          await _firestore.collection('users').doc(uid).update({
+            'isApproved': true,
+            'role': 'dean',
+          });
+        }
 
-        // Save to Firestore
-        await _firestore.collection('users').doc(uid).set({
-          'erpId': p['erpId'],
-          'name': p['name'],
-          'email': p['email'],
-          'role': 'principal',
-          'department': p['department'] ?? 'Administration',
-          'year': DateTime.now().year.toString(),
-          'phone': p['phone'] ?? '',
-          'address': '',
-          'photoUrl': '',
-          'fcmToken': '',
-          'isApproved': true, // Principal is always pre-approved
-          'classId': '',
-          'classLabel': '',
-          'coordinatorId': '',
-          'createdAt': DateTime.now(),
-        });
-
-        // Sign back out after creating (we don't want to stay logged in as principal)
+        // Sign back out after creating (we don't want to stay logged in as Dean)
         await _auth.signOut();
       } catch (e) {
-        // If email-already-in-use, that's fine — just skip
-        if (!e.toString().contains('email-already-in-use')) {
-          rethrow;
-        }
+        debugPrint('[seedPrincipalAccounts] Could not seed ${p['email']}: $e');
       }
     }
+  }
+
+  // ── Dean: delete own account ──────────────────────────────
+  // Removes both the Firestore profile and the Firebase Auth account
+  // itself, then signs out. Firebase Auth requires a "recent" login
+  // for self account-deletion — if it's been a while since the Dean
+  // signed in, this throws requires-recent-login, which the caller
+  // shows as "please log out and log back in, then try again".
+  Future<void> deleteOwnAccount() async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Not signed in.');
+    final uid = user.uid;
+
+    // Delete the Firestore profile first (allowed: isOwner(uid) is
+    // still true here since we haven't deleted the Auth account yet).
+    await _firestore.collection('users').doc(uid).delete();
+
+    // Now delete the Auth account itself. If this throws
+    // requires-recent-login, the Firestore doc above is already gone,
+    // which is fine — the outer seeding logic will simply recreate it
+    // next launch if the Auth account still exists.
+    await user.delete();
   }
 }

@@ -59,6 +59,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _admittedCategory;
   String? _otherCategory = 'None';
   String _hostelFacility = 'No';
+  final _religionOtherCtrl = TextEditingController();
+  final _casteOtherCtrl = TextEditingController();
+  final _actualCategoryOtherCtrl = TextEditingController();
+  final _admittedCategoryOtherCtrl = TextEditingController();
+  final _occupationOtherCtrl = TextEditingController();
+
+  // "Other" selected → free-text entry is required for that field
+  bool get _isReligionOther => _religion == 'Other';
+  bool get _isCasteOther => (_caste ?? '').startsWith('Other');
+  bool get _isActualCategoryOther => _actualCategory == 'Other';
+  bool get _isAdmittedCategoryOther => _admittedCategory == 'Other';
+  bool get _isOccupationOther => _guardianOccupation == 'Other';
 
   // Staff fields (non-student)
   String _selectedRole = 'student';
@@ -163,11 +175,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
         taluka: _taluka ?? '',
         village: _village ?? '',
         fatherOrHusbandName: _fatherNameCtrl.text.trim(),
-        guardianOccupation: _guardianOccupation ?? '',
-        religion: _religion ?? '',
-        caste: _caste ?? '',
-        actualCasteCategory: _actualCategory ?? '',
-        admittedCasteCategory: _admittedCategory ?? '',
+        guardianOccupation: _isOccupationOther
+            ? _occupationOtherCtrl.text.trim()
+            : (_guardianOccupation ?? ''),
+        religion: _isReligionOther
+            ? _religionOtherCtrl.text.trim()
+            : (_religion ?? ''),
+        caste: _isCasteOther ? _casteOtherCtrl.text.trim() : (_caste ?? ''),
+        actualCasteCategory: _isActualCategoryOther
+            ? _actualCategoryOtherCtrl.text.trim()
+            : (_actualCategory ?? ''),
+        admittedCasteCategory: _isAdmittedCategoryOther
+            ? _admittedCategoryOtherCtrl.text.trim()
+            : (_admittedCategory ?? ''),
         otherCategory: _otherCategory ?? 'None',
         hostelFacility: _hostelFacility,
       );
@@ -176,7 +196,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _showSnack(
         _isStudent
             ? 'Registration submitted! Your class coordinator will review and approve your account.\nERP ID: ${user?.erpId ?? ""}'
-            : 'Registration submitted. Awaiting Incharge/Principal approval.',
+            : 'Registration submitted. Awaiting Incharge/Dean approval.',
         isError: false,
         duration: 6,
       );
@@ -267,8 +287,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ],
 
             const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 TextButton(
                   onPressed: () => Navigator.push(
@@ -742,6 +763,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
           onChanged: (v) => setState(() => _guardianOccupation = v),
           validator: (v) => v == null ? 'Please select occupation.' : null,
         ),
+        if (_isOccupationOther) ...[
+          const SizedBox(height: 14),
+          _Field(
+            ctrl: _occupationOtherCtrl,
+            label: 'Please specify occupation',
+            icon: Icons.edit_outlined,
+            validator: (v) => (v == null || v.trim().isEmpty)
+                ? 'Please specify occupation.'
+                : null,
+          ),
+        ],
         const SizedBox(height: 20),
 
         // ── Category / Religion section ──────────────────
@@ -777,6 +809,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
             onChanged: (v) => setState(() => _caste = v),
             validator: (v) => v == null ? 'Please select caste.' : null,
           ),
+          if (_isCasteOther) ...[
+            const SizedBox(height: 14),
+            _Field(
+              ctrl: _casteOtherCtrl,
+              label: 'Please specify caste',
+              icon: Icons.edit_outlined,
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Please specify caste.' : null,
+            ),
+          ],
+        ],
+        if (_isReligionOther) ...[
+          const SizedBox(height: 14),
+          _Field(
+            ctrl: _religionOtherCtrl,
+            label: 'Please specify religion',
+            icon: Icons.edit_outlined,
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? 'Please specify religion.' : null,
+          ),
         ],
         const SizedBox(height: 14),
 
@@ -793,6 +845,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
           validator: (v) =>
               v == null ? 'Please select actual caste category.' : null,
         ),
+        if (_isActualCategoryOther) ...[
+          const SizedBox(height: 14),
+          _Field(
+            ctrl: _actualCategoryOtherCtrl,
+            label: 'Please specify actual caste category',
+            icon: Icons.edit_outlined,
+            validator: (v) => (v == null || v.trim().isEmpty)
+                ? 'Please specify actual caste category.'
+                : null,
+          ),
+        ],
         const SizedBox(height: 14),
 
         // 23. Admitted Caste Category
@@ -808,6 +871,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
           validator: (v) =>
               v == null ? 'Please select admitted caste category.' : null,
         ),
+        if (_isAdmittedCategoryOther) ...[
+          const SizedBox(height: 14),
+          _Field(
+            ctrl: _admittedCategoryOtherCtrl,
+            label: 'Please specify admitted caste category',
+            icon: Icons.edit_outlined,
+            validator: (v) => (v == null || v.trim().isEmpty)
+                ? 'Please specify admitted caste category.'
+                : null,
+          ),
+        ],
         const SizedBox(height: 14),
 
         // 24. Other Category
@@ -834,11 +908,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
             children: [
               const Icon(Icons.hotel_outlined, color: Colors.grey, size: 22),
               const SizedBox(width: 12),
-              const Text(
-                'Hostel Facility Required?',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              const Expanded(
+                child: Text(
+                  'Hostel Facility Required?',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                ),
               ),
-              const Spacer(),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -848,17 +923,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     onChanged: (v) => setState(() => _hostelFacility = v!),
                     activeColor: AppTheme.success,
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
                   ),
-                  const Text('Yes'),
-                  const SizedBox(width: 8),
+                  const Text('Yes', style: TextStyle(fontSize: 13)),
                   Radio<String>(
                     value: 'No',
                     groupValue: _hostelFacility,
                     onChanged: (v) => setState(() => _hostelFacility = v!),
                     activeColor: AppTheme.error,
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
                   ),
-                  const Text('No'),
+                  const Text('No', style: TextStyle(fontSize: 13)),
                 ],
               ),
             ],
@@ -957,7 +1033,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Your account requires approval from Incharge or Principal before you can login.',
+                  'Your account requires approval from Incharge or Dean before you can login.',
                   style: TextStyle(color: AppTheme.warning, fontSize: 12),
                 ),
               ),

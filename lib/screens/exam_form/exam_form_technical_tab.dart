@@ -5,7 +5,7 @@ import '../../services/exam_form_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 
-/// Exam Form tab inside TechnicalDashboard
+/// Exam Form tab inside EducationDashboard
 /// Fee is already set when Professor adds the subject (regularFee / backlogFee)
 /// Technical staff can see the fee breakdown and Approve or Reject — no fee editing here.
 class ExamFormTechnicalTab extends StatelessWidget {
@@ -349,28 +349,36 @@ class _TechFormCard extends StatelessWidget {
                   border:
                       Border.all(color: Colors.teal.withOpacity(0.2)),
                 ),
-                child: Row(
+                child: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  runSpacing: 4,
                   children: [
-                    const Icon(Icons.currency_rupee,
-                        color: Colors.teal, size: 16),
-                    const SizedBox(width: 6),
-                    const Text('Total Exam Fee: ',
-                        style: TextStyle(fontSize: 12, color: Colors.teal)),
-                    Text(
-                      '₹${grandTotal.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: Colors.teal),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.currency_rupee,
+                            color: Colors.teal, size: 16),
+                        const SizedBox(width: 6),
+                        const Text('Total Exam Fee: ',
+                            style: TextStyle(fontSize: 12, color: Colors.teal)),
+                        Text(
+                          '₹${grandTotal.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: Colors.teal),
+                        ),
+                      ],
                     ),
-                    if (totalRegular > 0 && totalBacklog > 0) ...[
-                      const Spacer(),
-                      Text(
-                        'Reg: ₹${totalRegular.toStringAsFixed(0)}  +  BL: ₹${totalBacklog.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                            fontSize: 10, color: Colors.grey),
+                    if (totalRegular > 0 && totalBacklog > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Text(
+                          'Reg: ₹${totalRegular.toStringAsFixed(0)}  +  BL: ₹${totalBacklog.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                              fontSize: 10, color: Colors.grey),
+                        ),
                       ),
-                    ],
                   ],
                 ),
               ),

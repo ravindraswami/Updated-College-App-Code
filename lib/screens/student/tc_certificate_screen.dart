@@ -1,14 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'dart:ui' as ui;
-import 'dart:typed_data';
 import 'package:intl/intl.dart';
-import 'package:printing/printing.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import '../../models/user_model.dart';
 import '../../models/tc_model.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/image_export.dart';
 
 class TcCertificateScreen extends StatefulWidget {
   final TcModel tc;
@@ -26,134 +21,24 @@ class _TcCertificateScreenState extends State<TcCertificateScreen> {
   final _repaintKey = GlobalKey();
   bool _saving = false;
 
-  Future<Uint8List> _buildPdf() async {
-    final doc = pw.Document();
-    final tc = widget.tc;
-    final student = widget.student;
-    final name = student.nameAsPerHsc.isNotEmpty
-        ? student.nameAsPerHsc
-        : student.name;
-
-    final rows = [
-      ['Student Name', name],
-      ['ERP / Roll No.', tc.erpId],
-      ['Registration No.', tc.registerNo.isNotEmpty ? tc.registerNo : '—'],
-      ['Branch', tc.branch],
-      ['Year / Semester', '${tc.year} — ${tc.semester}'],
-      ['Date of Birth', tc.dob],
-      ["Mother's Name", tc.motherName],
-      ['Religion', tc.religion],
-      ['Caste / Category', '${tc.caste} (${tc.casteCategory})'],
-      ['Date of Admission', tc.dateOfAdmission],
-      ['Last Exam Passed', tc.lastExamPassed],
-      ['Reason for Leaving', tc.reasonForLeaving],
-      [
-        'Date of Issue',
-        tc.approvedDate.isNotEmpty
-            ? tc.approvedDate.substring(0, 10)
-            : DateFormat('dd/MM/yyyy').format(DateTime.now()),
-      ],
-    ];
-
-    doc.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        build: (context) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.center,
-          children: [
-            pw.Text(
-              'TRANSFER CERTIFICATE',
-              style: pw.TextStyle(
-                fontSize: 18,
-                fontWeight: pw.FontWeight.bold,
-                letterSpacing: 2,
-              ),
-            ),
-            pw.SizedBox(height: 4),
-            pw.Text(
-              'TC No: TC-${tc.id.substring(0, 8).toUpperCase()}',
-              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey),
-            ),
-            pw.SizedBox(height: 8),
-            pw.Divider(thickness: 1.5),
-            pw.SizedBox(height: 12),
-            pw.Text(
-              'This is to certify that the following student was a bonafide student of this institution and has been granted Transfer Certificate as per their request.',
-              style: const pw.TextStyle(fontSize: 11),
-              textAlign: pw.TextAlign.justify,
-            ),
-            pw.SizedBox(height: 16),
-            pw.Table(
-              border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
-              columnWidths: {
-                0: const pw.FixedColumnWidth(160),
-                1: const pw.FlexColumnWidth(),
-              },
-              children: rows.map((row) {
-                return pw.TableRow(children: [
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 5),
-                    child: pw.Text(row[0],
-                        style: pw.TextStyle(
-                            fontWeight: pw.FontWeight.bold, fontSize: 10)),
-                  ),
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 5),
-                    child: pw.Text(
-                        row[1].isNotEmpty ? row[1] : '—',
-                        style: const pw.TextStyle(fontSize: 10)),
-                  ),
-                ]);
-              }).toList(),
-            ),
-            pw.SizedBox(height: 40),
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Column(children: [
-                  pw.Container(width: 100, height: 1, color: PdfColors.black),
-                  pw.SizedBox(height: 4),
-                  pw.Text('Student Signature',
-                      style: const pw.TextStyle(
-                          fontSize: 9, color: PdfColors.grey)),
-                ]),
-                pw.Column(children: [
-                  pw.Container(width: 130, height: 1, color: PdfColors.black),
-                  pw.SizedBox(height: 4),
-                  pw.Text('Principal / Authorized Signatory',
-                      style: const pw.TextStyle(
-                          fontSize: 9, color: PdfColors.grey)),
-                ]),
-              ],
-            ),
-            pw.SizedBox(height: 16),
-            pw.Divider(color: PdfColors.grey300),
-            pw.SizedBox(height: 4),
-            pw.Text(
-              'Generated via Smart ERP • ${DateFormat('dd MMM yyyy').format(DateTime.now())}',
-              style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey),
-            ),
-          ],
-        ),
-      ),
-    );
-    return doc.save();
-  }
-
-  Future<void> _printOrDownload() async {
+  Future<void> _saveImage() async {
     setState(() => _saving = true);
     try {
-      final bytes = await _buildPdf();
-      await Printing.layoutPdf(onLayout: (_) async => bytes);
-    } catch (e) {
+      final bytes = await ImageExportUtils.captureBoundary(_repaintKey);
+      GalSaveResult result = const GalSaveResult(false, 'Could not render the image.');
+      if (bytes != null) {
+        result = await ImageExportUtils.saveToGallery(bytes, 'TC_${widget.tc.erpId}');
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: AppTheme.error,
+            content: Text(
+              result.success
+                  ? 'Saved to "Smart ERP" album in your gallery.'
+                  : (result.error ?? 'Could not save image.'),
+            ),
+            backgroundColor: result.success ? AppTheme.success : AppTheme.error,
+            duration: Duration(seconds: result.success ? 3 : 8),
           ),
         );
       }
@@ -162,15 +47,17 @@ class _TcCertificateScreenState extends State<TcCertificateScreen> {
     }
   }
 
-  Future<void> _shareAsPdf() async {
+  Future<void> _shareImage() async {
     setState(() => _saving = true);
     try {
-      final bytes = await _buildPdf();
-      await Printing.sharePdf(
-        bytes: bytes,
-        filename:
-            'TC_${widget.tc.erpId}_${DateTime.now().millisecondsSinceEpoch}.pdf',
-      );
+      final bytes = await ImageExportUtils.captureBoundary(_repaintKey);
+      if (bytes != null) {
+        await ImageExportUtils.shareImage(
+          bytes,
+          'TC_${widget.tc.erpId}_${DateTime.now().millisecondsSinceEpoch}',
+          text: 'Transfer Certificate',
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -202,14 +89,14 @@ class _TcCertificateScreenState extends State<TcCertificateScreen> {
             )
           else ...[
             IconButton(
-              onPressed: _printOrDownload,
-              icon: const Icon(Icons.print),
-              tooltip: 'Print / Save PDF',
+              onPressed: _saveImage,
+              icon: const Icon(Icons.download_rounded),
+              tooltip: 'Save as Image',
             ),
             IconButton(
-              onPressed: _shareAsPdf,
+              onPressed: _shareImage,
               icon: const Icon(Icons.share),
-              tooltip: 'Share as PDF',
+              tooltip: 'Share as Image',
             ),
           ],
         ],
@@ -225,9 +112,9 @@ class _TcCertificateScreenState extends State<TcCertificateScreen> {
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: ElevatedButton.icon(
-            icon: const Icon(Icons.print),
-            label: const Text('Print / Download PDF'),
-            onPressed: _saving ? null : _printOrDownload,
+            icon: const Icon(Icons.download_rounded),
+            label: const Text('Save Image'),
+            onPressed: _saving ? null : _saveImage,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.success,
               padding: const EdgeInsets.symmetric(vertical: 14),

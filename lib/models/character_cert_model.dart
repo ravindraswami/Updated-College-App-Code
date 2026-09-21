@@ -21,6 +21,10 @@ class CharacterCertModel {
   final String approvedBy; // Technical staff UID
   final String approvedDate;
   final DateTime createdAt;
+  // Req #5: "during the Year" text shown on the printed certificate.
+  // Defaults to the student's current academic year at request time
+  // (kept in sync with their profile), editable via CharacterCertEditScreen.
+  final String academicYear;
 
   CharacterCertModel({
     required this.id,
@@ -41,6 +45,7 @@ class CharacterCertModel {
     this.approvedBy = '',
     this.approvedDate = '',
     required this.createdAt,
+    this.academicYear = '',
   });
 
   factory CharacterCertModel.fromMap(Map<String, dynamic> map, String id) {
@@ -63,6 +68,7 @@ class CharacterCertModel {
       approvedBy: map['approvedBy'] ?? '',
       approvedDate: map['approvedDate'] ?? '',
       createdAt: (map['createdAt'] as dynamic)?.toDate() ?? DateTime.now(),
+      academicYear: map['academicYear'] ?? '',
     );
   }
 
@@ -84,6 +90,7 @@ class CharacterCertModel {
     'approvedBy': approvedBy,
     'approvedDate': approvedDate,
     'createdAt': createdAt,
+    'academicYear': academicYear,
   };
 
   static String statusLabel(String s) {

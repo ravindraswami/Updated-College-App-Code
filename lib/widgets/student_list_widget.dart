@@ -32,14 +32,21 @@ class StudentListWidget extends StatelessWidget {
                 children: [
                   const Icon(Icons.school, color: AppTheme.primary, size: 18),
                   const SizedBox(width: 8),
-                  Text(
-                    '${students.length} Students',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  Flexible(
+                    child: Text(
+                      '${students.length} Students',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  const Spacer(),
-                  Text(
-                    'Approved: ${students.where((s) => s.isApproved).length}',
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'Approved: ${students.where((s) => s.isApproved).length}',
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
+                    ),
                   ),
                 ],
               ),

@@ -5,6 +5,7 @@ import '../../models/character_cert_model.dart';
 import '../../services/character_cert_service.dart';
 import '../../services/fee_config_service.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/academic_data.dart';
 import 'payment_screen.dart';
 
 class CharacterCertScreen extends StatelessWidget {
@@ -286,11 +287,15 @@ class _CcFormScreenState extends State<_CcFormScreen> {
           purpose: _purposeCtrl.text.trim(),
           charges: _charges,
           createdAt: DateTime.now(),
+          academicYear: AcademicData.defaultAcademicYearFor(
+            admissionDate: s.admissionDate,
+            yearId: s.year,
+          ),
         ),
       );
       if (!mounted) return;
       // 2. Navigate to PaymentScreen with real SBI link
-      Navigator.pushReplacement(
+      Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => PaymentScreen(

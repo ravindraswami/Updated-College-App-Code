@@ -28,6 +28,23 @@ class ClassAdvisorAssignmentService {
         );
   }
 
+  Stream<List<ClassAdvisorAssignmentModel>> getAssignmentsForAdvisor(
+    String advisorId,
+  ) {
+    return _db
+        .collection(_col)
+        .where('advisorId', isEqualTo: advisorId)
+        .snapshots()
+        .map(
+          (s) => s.docs
+              .map(
+                (d) =>
+                    ClassAdvisorAssignmentModel.fromMap(d.data(), d.id),
+              )
+              .toList(),
+        );
+  }
+
   Stream<List<ClassAdvisorAssignmentModel>> getAllAssignments() {
     return _db
         .collection(_col)
@@ -42,21 +59,27 @@ class ClassAdvisorAssignmentService {
         );
   }
 
-  /// Finds the advisor assigned to a given branch + year + regNo, if any.
+  /// Finds the advisor assigned to a given branch + year + semester + regNo,
+  /// if any. Falls back to a year-only match (semester blank on the
+  /// assignment) for backward compatibility with older assignments.
   Future<ClassAdvisorAssignmentModel?> findAdvisorFor(
     String branch,
     String year,
-    String regNo,
-  ) async {
+    String regNo, {
+    String semester = '',
+  }) async {
     final snap = await _db
         .collection(_col)
         .where('branch', isEqualTo: branch)
         .where('year', isEqualTo: year)
         .get();
+    ClassAdvisorAssignmentModel? fallback;
     for (final d in snap.docs) {
       final a = ClassAdvisorAssignmentModel.fromMap(d.data(), d.id);
-      if (a.matchesRegNo(regNo)) return a;
+      if (!a.matchesRegNo(regNo)) continue;
+      if (semester.isNotEmpty && a.semester == semester) return a;
+      if (a.semester.isEmpty) fallback = a;
     }
-    return null;
+    return fallback;
   }
 }
